@@ -1,0 +1,89 @@
+-- cus this time you crossed the line
+local Lighting = game:GetService("Lighting")
+local Terrain = workspace:FindFirstChildOfClass("Terrain")
+
+pcall(function()
+    Lighting.GlobalShadows = false
+    Lighting.Brightness = 1
+    Lighting.FogEnd = 9e9
+    Lighting.EnvironmentDiffuseScale = 0
+    Lighting.EnvironmentSpecularScale = 0
+    Lighting.ClockTime = 14
+end)
+
+if Terrain then
+    pcall(function()
+        Terrain.Decoration = false
+        Terrain.WaterWaveSize = 0
+        Terrain.WaterWaveSpeed = 0
+        Terrain.WaterReflectance = 0
+        Terrain.WaterTransparency = 1
+    end)
+end
+
+local function optimize(obj)
+    if obj:IsA("BasePart") then
+        obj.Material = Enum.Material.Plastic
+        obj.Reflectance = 0
+        obj.CastShadow = false
+
+    elseif obj:IsA("Texture")
+        or obj:IsA("Decal") then
+        obj:Destroy()
+
+
+    elseif obj:IsA("BillboardGui")
+        or obj:IsA("SurfaceGui") then
+        obj.Enabled = false
+
+
+    elseif obj:IsA("ParticleEmitter")
+        or obj:IsA("Trail")
+        or obj:IsA("Beam")
+        or obj:IsA("Smoke")
+        or obj:IsA("Fire")
+        or obj:IsA("Sparkles") then
+        obj.Enabled = false
+
+    elseif obj:IsA("Highlight") then
+        obj.Enabled = false
+
+    elseif obj:IsA("PointLight")
+        or obj:IsA("SpotLight")
+        or obj:IsA("SurfaceLight") then
+        obj.Enabled = false
+
+    elseif obj:IsA("Explosion") then
+        obj.BlastPressure = 0
+        obj.BlastRadius = 0
+
+    elseif obj:IsA("PostEffect") then
+        obj.Enabled = false
+
+    elseif obj:IsA("Sky") then
+        obj:Destroy()
+
+    elseif obj:IsA("Atmosphere") then
+        obj:Destroy()
+
+    elseif obj:IsA("Clouds") then
+        obj:Destroy()
+
+    elseif obj:IsA("BloomEffect")
+        or obj:IsA("BlurEffect")
+        or obj:IsA("ColorCorrectionEffect")
+        or obj:IsA("DepthOfFieldEffect")
+        or obj:IsA("SunRaysEffect") then
+        obj.Enabled = false
+    end
+end
+
+for _, v in ipairs(game:GetDescendants()) do
+    pcall(optimize, v)
+end
+
+game.DescendantAdded:Connect(function(v)
+    task.defer(function()
+        pcall(optimize, v)
+    end)
+end)
