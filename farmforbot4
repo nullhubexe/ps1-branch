@@ -1,0 +1,407 @@
+-- Webhook URL
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1531244922945015928/I1OBXVQMZ4PoO5cGOiuJYR_5Gz9UkC8vedJS93NnMccNJoqbeBZHzwb0Wc5KsB1Dbl8p"
+
+-- Check if user is 100throne100
+local player = game.Players.LocalPlayer
+if player.Name ~= "101throne101" then
+    print("❌ This script is only for 100throne100")
+    return
+end
+
+print("✅ User verified: 100throne100")
+
+-- Function to send webhook
+local function sendWebhook(content, embed)
+    local data = {
+        content = content or "",
+        username = "t3ars"
+    }
+    
+    if embed then
+        data.embeds = {embed}
+    end
+    
+    local json = game:GetService("HttpService"):JSONEncode(data)
+    
+    task.spawn(function()
+        local success, response = pcall(function()
+            local request = syn and syn.request or request or http_request
+            return request({
+                Url = WEBHOOK_URL,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+                Body = json
+            })
+        end)
+        
+        if not success then
+            warn("Failed to send webhook: " .. tostring(response))
+        end
+    end)
+end
+
+-- Function to get pet name from ID using directory
+local function getPetName(petId)
+    local dir = require(game.ReplicatedStorage['1 | Directory']).Pets
+    for _, pet in pairs(dir) do
+        if pet.id == petId then
+            return pet.DisplayName or "Unknown Pet"
+        end
+    end
+    return "Unknown Pet"
+end
+
+-- Function to get pet level from ID
+local function getPetLevel(petId)
+    local stats = workspace.__REMOTES.Core["Get Stats"]:InvokeServer()
+    
+    for _, pet in pairs(stats.Save.Pets) do
+        if pet.id == petId then
+            local lvl = pet.l or 0
+            
+            if pet.h then
+                for _, h in pairs(stats.Save.Hats) do
+                    if h.id == pet.h then
+                        lvl += (h.l or 0)
+                        break
+                    end
+                end
+            end
+            
+            return lvl
+        end
+    end
+    
+    return 0
+end
+
+-- Function to get pet variant (Gold, Rainbow, DM, Glitched) and full details
+local function getPetDetails(petId)
+    local stats = workspace.__REMOTES.Core["Get Stats"]:InvokeServer()
+    local dir = require(game.ReplicatedStorage['1 | Directory']).Pets
+    
+    for _, pet in pairs(stats.Save.Pets) do
+        if pet.id == petId then
+            -- Get pet name from directory using the n key
+            local petData = dir[pet.n]
+            local name = petData and petData.DisplayName or "Unknown Pet"
+            
+            -- Check variant
+            local variant = "Normal"
+            if pet.dm and pet.r then
+                variant = "Glitched"
+            elseif pet.dm then
+                variant = "DM"
+            elseif pet.r then
+                variant = "Rainbow"
+            elseif pet.g then
+                variant = "Gold"
+            end
+            
+            return {
+                name = name,
+                variant = variant,
+                level = pet.l or 0,
+                n = pet.n,
+                pet = pet
+            }
+        end
+    end
+    
+    return {
+        name = "Unknown Pet",
+        variant = "Unknown",
+        level = 0,
+        n = nil,
+        pet = nil
+    }
+end
+
+-- Load required scripts
+wait(3)
+loadstring(game:HttpGet("https://pastebin.com/raw/S7uzDeEE"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/nullhubexe/ps1-branch/refs/heads/main/antifps"))()
+game.Players.LocalPlayer.PlayerGui.Events:ClearAllChildren()
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local LocalPlayer = Players.LocalPlayer
+
+--// SETTINGS
+local AUTO_REJOIN = true
+local REJOIN_INTERVAL = 300
+
+--// PET IDS (Your 4 farming pets)
+local PET1 = 95213252
+local PET2 = 20927468
+local PET3 = 71689421
+local PET4 = 97215279
+
+-- Get pet details
+local details1 = getPetDetails(PET1)
+local details2 = getPetDetails(PET2)
+local details3 = getPetDetails(PET3)
+local details4 = getPetDetails(PET4)
+
+-- TARGETS
+local BIG_CANES = {
+    ["Christmas3 Cane"] = true
+}
+
+local SMALL_CANES = {
+    ["Christmas3 Small Cane"] = true
+}
+
+local ZONE2_BIG = {
+    ["Christmas2 Coin"] = true,
+    ["Christmas2 Coin Stack"] = true,
+    ["Christmas2 Chest"] = true
+}
+
+local ZONE2_SMALL = {
+    ["Christmas2 Small Coin"] = true,
+    ["Christmas2 Small Chest"] = true
+}
+
+-- GAME REFERENCES
+local REMOTES = workspace.__REMOTES
+local COINS = workspace.__THINGS.Coins
+
+_G.FARMING = true
+
+-- Get initial pet levels
+local LVL1 = details1.level
+local LVL2 = details2.level
+local LVL3 = details3.level
+local LVL4 = details4.level
+
+-- Send initial webhook with pet names and levels
+local function sendInitialWebhook()
+    local displayName = LocalPlayer.DisplayName or LocalPlayer.Name
+    
+    local embed = {
+        title = "🚀 **Farm Started**",
+        description = "Farming script activated for 100throne100",
+        color = 0x00ff00,
+        fields = {
+            {
+                name = "👤 Player",
+                value = displayName,
+                inline = true
+            },
+            {
+                name = "🏠 Server",
+                value = game.JobId,
+                inline = true
+            },
+            {
+                name = "⏰ Time",
+                value = os.date("%Y-%m-%d %H:%M:%S"),
+                inline = true
+            },
+            {
+                name = "━━━━━━━━━━━━",
+                value = "**Pet Levels**",
+                inline = false
+            },
+            {
+                name = "🐾 " .. details1.name .. " (" .. details1.variant .. ")",
+                value = "Level: **" .. LVL1 .. "**\nID: `" .. PET1 .. "`",
+                inline = true
+            },
+            {
+                name = "🐾 " .. details2.name .. " (" .. details2.variant .. ")",
+                value = "Level: **" .. LVL2 .. "**\nID: `" .. PET2 .. "`",
+                inline = true
+            },
+            {
+                name = "🐾 " .. details3.name .. " (" .. details3.variant .. ")",
+                value = "Level: **" .. LVL3 .. "**\nID: `" .. PET3 .. "`",
+                inline = true
+            },
+            {
+                name = "🐾 " .. details4.name .. " (" .. details4.variant .. ")",
+                value = "Level: **" .. LVL4 .. "**\nID: `" .. PET4 .. "`",
+                inline = true
+            },
+            {
+                name = "━━━━━━━━━━━━",
+                value = "**Farming Targets**",
+                inline = false
+            },
+            {
+                name = "🎯 Zone 1",
+                value = "Christmas3 Cane\nChristmas3 Small Cane",
+                inline = true
+            },
+            {
+                name = "🎯 Zone 2",
+                value = "Christmas2 Coin, Stack, Chest\nChristmas2 Small Coin, Small Chest",
+                inline = true
+            }
+        },
+        footer = {
+            text = "Pet Simulator X - Auto Farm | 100throne100"
+        },
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+    }
+    
+    sendWebhook("**✨ Farm Started Successfully**", embed)
+end
+
+-- Send initial webhook
+sendInitialWebhook()
+
+-- Auto rejoin
+if AUTO_REJOIN then
+    task.spawn(function()
+        while _G.FARMING and LocalPlayer and LocalPlayer.Parent do
+            task.wait(REJOIN_INTERVAL)
+
+            if #Players:GetPlayers() <= 1 then
+                LocalPlayer:Kick("Rejoining...")
+                task.wait(1)
+                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            else
+                pcall(function()
+                    TeleportService:TeleportToPlaceInstance(
+                        game.PlaceId,
+                        game.JobId,
+                        LocalPlayer
+                    )
+                end)
+            end
+        end
+    end)
+end
+
+-- Monitor pet levels and send updates
+task.spawn(function()
+    while _G.FARMING do
+        task.wait(3000) -- Check every 30 seconds
+        
+        local newDetails1 = getPetDetails(PET1)
+        local newDetails2 = getPetDetails(PET2)
+        local newDetails3 = getPetDetails(PET3)
+        local newDetails4 = getPetDetails(PET4)
+        
+        -- Send update if any level changed
+        if newDetails1.level ~= LVL1 or newDetails2.level ~= LVL2 or newDetails3.level ~= LVL3 or newDetails4.level ~= LVL4 then
+            LVL1 = newDetails1.level
+            LVL2 = newDetails2.level
+            LVL3 = newDetails3.level
+            LVL4 = newDetails4.level
+            
+            local embed = {
+                title = "📊 **Pet Levels Updated**",
+                color = 0x00aaff,
+                fields = {
+                    {
+                        name = "🐾 " .. newDetails1.name .. " (" .. newDetails1.variant .. ")",
+                        value = "Level: **" .. LVL1 .. "**",
+                        inline = true
+                    },
+                    {
+                        name = "🐾 " .. newDetails2.name .. " (" .. newDetails2.variant .. ")",
+                        value = "Level: **" .. LVL2 .. "**",
+                        inline = true
+                    },
+                    {
+                        name = "🐾 " .. newDetails3.name .. " (" .. newDetails3.variant .. ")",
+                        value = "Level: **" .. LVL3 .. "**",
+                        inline = true
+                    },
+                    {
+                        name = "🐾 " .. newDetails4.name .. " (" .. newDetails4.variant .. ")",
+                        value = "Level: **" .. LVL4 .. "**",
+                        inline = true
+                    },
+                    {
+                        name = "⏰ Time",
+                        value = os.date("%Y-%m-%d %H:%M:%S"),
+                        inline = false
+                    }
+                },
+                footer = {
+                    text = "Auto-updating every 30 seconds | 100throne100"
+                },
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+            }
+            
+            sendWebhook("**🔄 Pet Levels Updated**", embed)
+        end
+    end
+end)
+
+-- =============================
+-- FARM LOOP
+-- =============================
+local last = {p1 = 0, p2 = 0, p3 = 0, p4 = 0}
+local DELAY = 0.13
+
+task.spawn(function()
+    while _G.FARMING do
+        local now = os.clock()
+
+        for _, coin in ipairs(COINS:GetChildren()) do
+            local nameObj = coin:FindFirstChild("CoinName")
+            if not nameObj then continue end
+
+            local name = nameObj.Value
+
+            if BIG_CANES[name] then
+                if now - last.p1 > DELAY then
+                    REMOTES.Game.Coins:FireServer("Mine", coin.Name, LVL1 * 2 - 1, PET1)
+                    last.p1 = now
+                end
+
+            elseif SMALL_CANES[name] then
+                if now - last.p2 > DELAY then
+                    REMOTES.Game.Coins:FireServer("Mine", coin.Name, LVL2 * 2 - 1, PET2)
+                    last.p2 = now
+                end
+
+            elseif ZONE2_BIG[name] then
+                if now - last.p3 > DELAY then
+                    REMOTES.Game.Coins:FireServer("Mine", coin.Name, LVL3 * 2 - 1, PET3)
+                    last.p3 = now
+                end
+
+            elseif ZONE2_SMALL[name] then
+                if now - last.p4 > DELAY then
+                    REMOTES.Game.Coins:FireServer("Mine", coin.Name, LVL4 * 2 - 1, PET4)
+                    last.p4 = now
+                end
+            end
+        end
+
+        task.wait(0.05)
+    end
+end)
+
+-- Debris cleaner
+local debris = workspace:WaitForChild("__DEBRIS")
+
+for _, i in ipairs(debris:GetChildren()) do
+    if i:IsA("BasePart") then
+        i:Destroy()
+    end
+end
+
+debris.ChildAdded:Connect(function(child)
+    if child:IsA("BasePart") then
+        task.wait()
+        if child and child.Parent then
+            child:Destroy()
+        end
+    end
+end)
+
+print("✅ Farm started for 100throne100!")
+print("📊 Pet Details:")
+print("  " .. details1.name .. " (" .. details1.variant .. "): Level " .. LVL1 .. " (n: " .. (details1.n or "N/A") .. ")")
+print("  " .. details2.name .. " (" .. details2.variant .. "): Level " .. LVL2 .. " (n: " .. (details2.n or "N/A") .. ")")
+print("  " .. details3.name .. " (" .. details3.variant .. "): Level " .. LVL3 .. " (n: " .. (details3.n or "N/A") .. ")")
+print("  " .. details4.name .. " (" .. details4.variant .. "): Level " .. LVL4 .. " (n: " .. (details4.n or "N/A") .. ")")
