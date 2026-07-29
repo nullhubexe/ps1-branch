@@ -134,10 +134,10 @@ local AUTO_REJOIN = true
 local REJOIN_INTERVAL = 300
 
 --// PET IDS (Your 4 farming pets)
-local PET1 = 82084042
-local PET2 = 58726936
-local PET3 = 15769758
-local PET4 = 20458228
+local PET1 = 83174840
+local PET2 = 98068025
+local PET3 = 83709283
+local PET4 = 88565261
 
 -- Get pet details
 local details1 = getPetDetails(PET1)
