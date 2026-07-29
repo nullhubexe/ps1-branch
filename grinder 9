@@ -1,4 +1,4 @@
-"-- Webhook URL
+-- Webhook URL
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1531244922945015928/I1OBXVQMZ4PoO5cGOiuJYR_5Gz9UkC8vedJS93NnMccNJoqbeBZHzwb0Wc5KsB1Dbl8p"
 
 -- Check if user is 100throne100
@@ -404,5 +404,4 @@ print("📊 Pet Details:")
 print("  " .. details1.name .. " (" .. details1.variant .. "): Level " .. LVL1 .. " (n: " .. (details1.n or "N/A") .. ")")
 print("  " .. details2.name .. " (" .. details2.variant .. "): Level " .. LVL2 .. " (n: " .. (details2.n or "N/A") .. ")")
 print("  " .. details3.name .. " (" .. details3.variant .. "): Level " .. LVL3 .. " (n: " .. (details3.n or "N/A") .. ")")
-print("  " .. details4.name .. " (" .. details4.variant .. "): Level " .. LVL4 .. " (n: " .. (details4.n or "N/A") .. ")")"
-
+print("  " .. details4.name .. " (" .. details4.variant .. "): Level " .. LVL4 .. " (n: " .. (details4.n or "N/A") .. ")")
