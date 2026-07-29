@@ -14,8 +14,7 @@ print("✅ User verified: 100throne100")
 local function sendWebhook(content, embed)
     local data = {
         content = content or "",
-        username = "Farm Bot",
-        avatar_url = "https://cdn.discordapp.com/attachments/123456789/987654321/avatar.png"
+        username = "t3ars"
     }
     
     if embed then
@@ -65,7 +64,7 @@ local function getPetLevel(petId)
             if pet.h then
                 for _, h in pairs(stats.Save.Hats) do
                     if h.id == pet.h then
-                        lvl = lvl + (h.l or 0)
+                        lvl += (h.l or 0)
                         break
                     end
                 end
@@ -134,13 +133,13 @@ local LocalPlayer = Players.LocalPlayer
 local AUTO_REJOIN = true
 local REJOIN_INTERVAL = 300
 
---// PET IDS (Your 4 farming pets) - MAKE SURE THESE ARE CORRECT
+--// PET IDS (Your 4 farming pets)
 local PET1 = 12554673
 local PET2 = 24859206
 local PET3 = 46004070
-local PET4 = 68736361
+local PET4 = 21125297
 
--- Get pet details with error handling
+-- Get pet details
 local details1 = getPetDetails(PET1)
 local details2 = getPetDetails(PET2)
 local details3 = getPetDetails(PET3)
@@ -172,11 +171,11 @@ local COINS = workspace.__THINGS.Coins
 
 _G.FARMING = true
 
--- Get initial pet levels - ensure they're numbers
-local LVL1 = details1.level or 0
-local LVL2 = details2.level or 0
-local LVL3 = details3.level or 0
-local LVL4 = details4.level or 0
+-- Get initial pet levels
+local LVL1 = details1.level
+local LVL2 = details2.level
+local LVL3 = details3.level
+local LVL4 = details4.level
 
 -- Send initial webhook with pet names and levels
 local function sendInitialWebhook()
@@ -290,10 +289,10 @@ task.spawn(function()
         
         -- Send update if any level changed
         if newDetails1.level ~= LVL1 or newDetails2.level ~= LVL2 or newDetails3.level ~= LVL3 or newDetails4.level ~= LVL4 then
-            LVL1 = newDetails1.level or 0
-            LVL2 = newDetails2.level or 0
-            LVL3 = newDetails3.level or 0
-            LVL4 = newDetails4.level or 0
+            LVL1 = newDetails1.level
+            LVL2 = newDetails2.level
+            LVL3 = newDetails3.level
+            LVL4 = newDetails4.level
             
             local embed = {
                 title = "📊 **Pet Levels Updated**",
@@ -353,25 +352,25 @@ task.spawn(function()
             local name = nameObj.Value
 
             if BIG_CANES[name] then
-                if now - last.p1 > DELAY and LVL1 and LVL1 > 0 then
+                if now - last.p1 > DELAY then
                     REMOTES.Game.Coins:FireServer("Mine", coin.Name, LVL1 * 2 - 1, PET1)
                     last.p1 = now
                 end
 
             elseif SMALL_CANES[name] then
-                if now - last.p2 > DELAY and LVL2 and LVL2 > 0 then
+                if now - last.p2 > DELAY then
                     REMOTES.Game.Coins:FireServer("Mine", coin.Name, LVL2 * 2 - 1, PET2)
                     last.p2 = now
                 end
 
             elseif ZONE2_BIG[name] then
-                if now - last.p3 > DELAY and LVL3 and LVL3 > 0 then
+                if now - last.p3 > DELAY then
                     REMOTES.Game.Coins:FireServer("Mine", coin.Name, LVL3 * 2 - 1, PET3)
                     last.p3 = now
                 end
 
             elseif ZONE2_SMALL[name] then
-                if now - last.p4 > DELAY and LVL4 and LVL4 > 0 then
+                if now - last.p4 > DELAY then
                     REMOTES.Game.Coins:FireServer("Mine", coin.Name, LVL4 * 2 - 1, PET4)
                     last.p4 = now
                 end
