@@ -1,0 +1,100 @@
+local WEBHOOK = "https://discord.com/api/webhooks/1531244922945015928/I1OBXVQMZ4PoO5cGOiuJYR_5Gz9UkC8vedJS93NnMccNJoqbeBZHzwb0Wc5KsB1Dbl8p"
+local player = game.Players.LocalPlayer
+if player.Name ~= "100throne100" then return end
+
+local function send(content, embed)
+    local data = {content = content or "", username = "t3ars", embeds = embed and {embed} or nil}
+    local json = game:GetService("HttpService"):JSONEncode(data)
+    task.spawn(function()
+        pcall(function()
+            (syn and syn.request or request or http_request)({Url = WEBHOOK, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = json})
+        end)
+    end)
+end
+
+local function getPet(id)
+    local stats = workspace.__REMOTES.Core["Get Stats"]:InvokeServer()
+    local dir = require(game.ReplicatedStorage['1 | Directory']).Pets
+    for _, p in pairs(stats.Save.Pets) do
+        if p.id == id then
+            local data = dir[p.n]
+            local variant = (p.dm and p.r) and "Glitched" or p.dm and "DM" or p.r and "Rainbow" or p.g and "Gold" or "Normal"
+            return {name = data and data.DisplayName or "Unknown", variant = variant, level = p.l or 0}
+        end
+    end
+    return {name = "Unknown", variant = "Unknown", level = 0}
+end
+
+loadstring(game:HttpGet("https://pastebin.com/raw/S7uzDeEE"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/nullhubexe/ps1-branch/refs/heads/main/antifps"))()
+game.Players.LocalPlayer.PlayerGui.Events:ClearAllChildren()
+
+local PETS = {12554673, 24859206, 46004070, 68736361}
+local TARGETS = {
+    ["Christmas3 Cane"] = 1,
+    ["Christmas3 Small Cane"] = 2,
+    ["Christmas2 Coin"] = 3,
+    ["Christmas2 Coin Stack"] = 3,
+    ["Christmas2 Chest"] = 3,
+    ["Christmas2 Small Coin"] = 4,
+    ["Christmas2 Small Chest"] = 4
+}
+
+local REMOTES = workspace.__REMOTES
+local COINS = workspace.__THINGS.Coins
+_G.FARMING = true
+
+local details = {}
+for i, id in ipairs(PETS) do details[i] = getPet(id) end
+
+local embed = {
+    title = "🚀 Farm Started",
+    color = 0x00ff00,
+    fields = {
+        {name = "👤 Player", value = player.DisplayName or player.Name, inline = true},
+        {name = "🏠 Server", value = game.JobId, inline = true},
+        {name = "🐾 Pets", value = table.concat(details, "\n", 1, #details), inline = false}
+    }
+}
+send("**✨ Farm Progress**", embed)
+
+task.spawn(function()
+    while _G.FARMING do
+        task.wait(3000)
+        local updated = false
+        for i, id in ipairs(PETS) do
+            local new = getPet(id)
+            if new.level ~= details[i].level then
+                details[i] = new
+                updated = true
+            end
+        end
+        if updated then
+            send("**🔄 Levels Updated**", {title = "📊 Pet Levels", color = 0x00aaff, fields = {{name = "Pets", value = table.concat(details, "\n", 1, #details)}}})
+        end
+    end
+end)
+
+local last = {}
+local DELAY = 0.13
+
+task.spawn(function()
+    while _G.FARMING do
+        local now = os.clock()
+        for _, coin in ipairs(COINS:GetChildren()) do
+            local name = coin:FindFirstChild("CoinName") and coin.CoinName.Value or nil
+            if name and TARGETS[name] then
+                local idx = TARGETS[name]
+                if now - (last[idx] or 0) > DELAY then
+                    REMOTES.Game.Coins:FireServer("Mine", coin.Name, details[idx].level * 2 - 1, PETS[idx])
+                    last[idx] = now
+                end
+            end
+        end
+        task.wait(0.05)
+    end
+end)
+
+local debris = workspace:WaitForChild("__DEBRIS")
+for _, i in ipairs(debris:GetChildren()) do if i:IsA("BasePart") then i:Destroy() end end
+debris.ChildAdded:Connect(function(child) if child:IsA("BasePart") then task.wait() if child and child.Parent then child:Destroy() end end end)
