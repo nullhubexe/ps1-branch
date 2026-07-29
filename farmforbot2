@@ -7,7 +7,12 @@ local function send(content, embed)
     local json = game:GetService("HttpService"):JSONEncode(data)
     task.spawn(function()
         pcall(function()
-            (syn and syn.request or request or http_request)({Url = WEBHOOK, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = json})
+            (syn and syn.request or request or http_request)({
+                Url = WEBHOOK, 
+                Method = "POST", 
+                Headers = {["Content-Type"] = "application/json"}, 
+                Body = json
+            })
         end)
     end)
 end
@@ -19,14 +24,23 @@ local function getPet(id)
         if p.id == id then
             local data = dir[p.n]
             local variant = (p.dm and p.r) and "Glitched" or p.dm and "DM" or p.r and "Rainbow" or p.g and "Gold" or "Normal"
-            return {name = data and data.DisplayName or "Unknown", variant = variant, level = p.l or 0}
+            return {
+                name = data and data.DisplayName or "Unknown", 
+                variant = variant, 
+                level = p.l or 0,
+                display = string.format("%s (%s) Lv.%d", data and data.DisplayName or "Unknown", variant, p.l or 0)
+            }
         end
     end
-    return {name = "Unknown", variant = "Unknown", level = 0}
+    return {
+        name = "Unknown", 
+        variant = "Unknown", 
+        level = 0,
+        display = "Unknown (Unknown) Lv.0"
+    }
 end
 
 loadstring(game:HttpGet("https://pastebin.com/raw/S7uzDeEE"))()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/nullhubexe/ps1-branch/refs/heads/main/antifps"))()
 game.Players.LocalPlayer.PlayerGui.Events:ClearAllChildren()
 
 local PETS = {27042603, 85698934, 79203336, 72389476}
@@ -45,7 +59,9 @@ local COINS = workspace.__THINGS.Coins
 _G.FARMING = true
 
 local details = {}
-for i, id in ipairs(PETS) do details[i] = getPet(id) end
+for i, id in ipairs(PETS) do 
+    details[i] = getPet(id).display
+end
 
 local embed = {
     title = "🚀 Farm Started",
@@ -53,7 +69,7 @@ local embed = {
     fields = {
         {name = "👤 Player", value = player.DisplayName or player.Name, inline = true},
         {name = "🏠 Server", value = game.JobId, inline = true},
-        {name = "🐾 Pets", value = table.concat(details, "\n", 1, #details), inline = false}
+        {name = "🐾 Pets", value = table.concat(details, "\n"), inline = false}
     }
 }
 send("**✨ Farm Progress**", embed)
@@ -64,13 +80,17 @@ task.spawn(function()
         local updated = false
         for i, id in ipairs(PETS) do
             local new = getPet(id)
-            if new.level ~= details[i].level then
-                details[i] = new
+            if new.display ~= details[i] then
+                details[i] = new.display
                 updated = true
             end
         end
         if updated then
-            send("**🔄 Levels Updated**", {title = "📊 Pet Levels", color = 0x00aaff, fields = {{name = "Pets", value = table.concat(details, "\n", 1, #details)}}})
+            send("**🔄 Levels Updated**", {
+                title = "📊 Pet Levels", 
+                color = 0x00aaff, 
+                fields = {{name = "Pets", value = table.concat(details, "\n")}}
+            })
         end
     end
 end)
@@ -96,5 +116,16 @@ task.spawn(function()
 end)
 
 local debris = workspace:WaitForChild("__DEBRIS")
-for _, i in ipairs(debris:GetChildren()) do if i:IsA("BasePart") then i:Destroy() end end
-debris.ChildAdded:Connect(function(child) if child:IsA("BasePart") then task.wait() if child and child.Parent then child:Destroy() end end end)
+for _, i in ipairs(debris:GetChildren()) do 
+    if i:IsA("BasePart") then 
+        i:Destroy() 
+    end 
+end
+debris.ChildAdded:Connect(function(child) 
+    if child:IsA("BasePart") then 
+        task.wait() 
+        if child and child.Parent then 
+            child:Destroy() 
+        end 
+    end 
+end)
