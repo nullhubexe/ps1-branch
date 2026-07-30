@@ -137,7 +137,7 @@ local REJOIN_INTERVAL = 300
 local PET1 = 82084042
 local PET2 = 58726936
 local PET3 = 15769758
-local PET4 = 20458228
+local PET4 = 8650794
 
 -- Get pet details
 local details1 = getPetDetails(PET1)
