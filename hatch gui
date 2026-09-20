@@ -1,0 +1,828 @@
+--[[
+    Hatching GUI v2
+    - Bigger, cleaner layout
+    - Tabs: Hatch / Whitelist / Pets
+    - No file saving, session only
+    - Fixed: dropdown clipping, race conditions, remote errors
+]]
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local LP = Players.LocalPlayer
+local PG = LP:WaitForChild("PlayerGui")
+
+-- wait for remotes
+local REMOTES = workspace:WaitForChild("__REMOTES", 10)
+if not REMOTES then
+    warn("[HatchGUI] __REMOTES not found — script won't work")
+    return
+end
+
+------------------------------------------------------------
+-- SETTINGS
+------------------------------------------------------------
+local Settings = {
+    Combine = true,
+    DeleteClientUpdater = false,
+    AutoHatch = false,
+    Tier = "Tier 17",
+    Whitelist = {
+        "Dominus Messor","Dominus Frigidus","Dominus Empyreus",
+        "Mortuus","1NE","ZER0","Ame Damnee","Domortuus",
+        "C0RE","C0RE SH0CK","Cyborg Dominus",
+        "Dominus Electric","Dominus Huge","Hydra","Agony",
+        "Randolph","Giant Penguin"
+    }
+}
+
+local TierList = {
+    "Tier 1","Tier 2","Tier 3","Tier 4","Tier 5","Tier 6","Tier 7",
+    "Tier 8","Tier 9","Tier 10","Tier 11","Tier 12","Tier 13",
+    "Tier 14","Tier 15","Tier 16","Tier 17","Tier 18",
+    "Cursed Hallow Egg","Hallow Egg","Snake Egg"
+}
+
+local Lib = {
+    [77002]='Festive Dragon',[9004]='Wavy Cheeta',[7004]='Dragon',[8004]='Demon',
+    [5004]='Bat',[6004]='Ladybug',[3004]='Pig',[4004]='Seal',[1004]='Lamb',
+    [2004]='Mouse',[16012]='Cyborg Dominus',[16009]='Cyborg Demon',[77003]='Snow Spike',
+    [15005]='Green Gummy Bear',[13007]='Space Dragon',[10004]='Electric Slime',
+    [66002]='Zombie Dog',[15006]='Yellow Gummy Bear',[15008]='Rainbow',[16002]='Cyborg Dog',
+    [12003]='Angel',[13001]='Alien',[15009]='Dark Candy Corn',[17003]='Dominus Noob',
+    [66003]='Spider',[12007]='Mortuus',[12005]='Ice Queen',[11004]='Lava Watermelon',
+    [76004]='Festive Racoon',[66004]='Pumpkin',[16006]='Red Space Ranger',
+    [16001]='Cyborg Cat',[11002]='Sherbert',[76001]='Festive Cat',[66001]='Zombie Cat',
+    [79003]='Giant Penguin',[15007]='Cookie',[1001]='Cat',[3001]='Dalmatian',
+    [2001]='Brown Cat',[5001]='Owl',[4001]='Koala',[7001]='Watermelon',
+    [6001]='Cheeta',[9001]='Fantasy Dragon',[8001]='Bomb',[66006]='Ghostdeeri',
+    [12004]='Fire King',[90003]='Red Snake',[78002]='Gingerbread',[17006]='Dominus Damnee',
+    [10003]='Lava Turtle',[15001]='Candy Cane',[18002]='Spike',[17009]='Dominus Huge',
+    [14005]='Space Bear',[2005]='White Bunny',[1005]='Orange Cat',[10002]='Lava Dalmatian',
+    [8005]='Cyclops',[9005]='Wavy Tiger',[4005]='Racoon',[3005]='Panda',
+    [13004]='Space Cat',[5005]='Bee',[18006]='Agony',[18001]='Aesthetic Cat',
+    [13002]='Puffer',[10001]='Lava Zebra',[17007]='Dominus Rainbow',[90001]='BIG Maskot',
+    [11005]='Wavy Bee',[10006]='Dominus Messor',[14004]='Space Cyclops',
+    [17001]='Dominus Pumpkin',[12002]='Reaper',[2002]='White Cat',[3002]='Bear',
+    [4002]='Crocodile',[5002]='Monkey',[6002]='Tiger',[7002]='Yeti',[8002]='Ghost',
+    [9002]='Cherry Bomb',[11006]='Unicorn',[90010]='Huge Cat',[15004]='Green Lollipop',
+    [16011]='C0RE SH0CK',[90008]='Noob',[1002]='Dog',[12006]='Immortuos',
+    [90009]='Love Cat',[14009]='1NE',[76002]='Festive Dog',[90006]='Dominus Partner',
+    [90005]='Wavy Snake',[16004]='Cyborg',[90004]='Purple Snake',[10008]='Dominus Empyreus',
+    [90002]='Green Snake',[79002]='Festive C0RE',[13003]='Wooga',[79001]='Festive Immortuos',
+    [78005]='Randolph',[78004]='Festive Dominus',[12001]='Tank',[78003]='Reindeer',
+    [78001]='Festive Ame Damnee',[18004]='Chimera',[77001]='Festive Seal',
+    [13005]='Space Dog',[76003]='Festive Bunny',[90007]='Love Dog',[66010]='Skeleton Ghost',
+    [66009]='Willow Wisp Green',[66008]='Willow Wisp',[66007]='Sorrow',[66005]='Skeleton',
+    [18005]='Hydra',[77004]='Ice Spike',[18003]='Magic Fox',[17008]='Dominus Electric',
+    [17005]='Dominus HeadStack',[13006]='Space Bunny',[16005]='Space Ranger',
+    [17002]='Dominus Cherry',[16010]='C0RE',[16008]='RoVer',[16007]='Friendly Cyborg',
+    [17004]='Dominus Wavy',[14002]='HeadStack',[16003]='Computer',[15011]='Domortuus',
+    [15010]='Ame Damnee',[15003]='Red Lollipop',[15002]='Candy Corn',
+    [10007]='Dominus Frigidus',[14008]='ZER0',[6003]='Zebra',[5003]='Turtle',
+    [4003]='Platypus',[3003]='Polar Bear',[2003]='White Dog',[1003]='Bunny',
+    [14007]='Dark Saturn',[10005]='Electric Ghost',[14006]='Saturn',[14003]='Space Owl',
+    [14001]='Revurse',[11003]='Robot',[11001]='Zombie',[9003]='Wavy Zebra',
+    [8003]='Cherry Monkey',[7003]='Slime'
+}
+
+------------------------------------------------------------
+-- HELPERS
+------------------------------------------------------------
+local function isBlacklisted(id)
+    return table.find(Settings.Whitelist, Lib[tonumber(id)]) == nil
+end
+
+local function GetStats()
+    local ok, res = pcall(function()
+        return REMOTES.Core["Get Other Stats"]:InvokeServer()[LP.Name]
+    end)
+    return ok and res or nil
+end
+
+local function combine()
+    local Stats = GetStats()
+    if not Stats or not Stats.Save then return end
+    local GT, RT, DMT = {}, {}, {}
+    for _, Pet in pairs(Stats.Save.Pets) do
+        local T = Pet.n
+        if not isBlacklisted(T) then
+            if not (Pet.g or Pet.r or Pet.dm) then
+                GT[T] = (GT[T] or 0) + 1
+            elseif Pet.g and not (Pet.r or Pet.dm) then
+                RT[T] = (RT[T] or 0) + 1
+            elseif Pet.r and not (Pet.g or Pet.dm) then
+                DMT[T] = (DMT[T] or 0) + 1
+            end
+        end
+    end
+    for PetN, Amount in pairs(GT) do
+        if Amount >= 10 then
+            for _, Pet in pairs(Stats.Save.Pets) do
+                if tostring(Pet.n) == tostring(PetN) and not (Pet.g or Pet.r or Pet.dm) and Amount >= 10 then
+                    pcall(function() REMOTES.Game["Golden Pets"]:InvokeServer(Pet.id) end)
+                    Amount = 0
+                end
+            end
+        end
+    end
+    for PetN, Amount in pairs(RT) do
+        if Amount >= 7 then
+            for _, Pet in pairs(Stats.Save.Pets) do
+                if tostring(Pet.n) == tostring(PetN) and Pet.g and not (Pet.r or Pet.dm) and Amount >= 7 then
+                    pcall(function() REMOTES.Game["Rainbow Pets"]:InvokeServer(Pet.id) end)
+                    Amount = 0
+                end
+            end
+        end
+    end
+    for PetN, Amount in pairs(DMT) do
+        if Amount >= 5 then
+            for _, Pet in pairs(Stats.Save.Pets) do
+                if tostring(Pet.n) == tostring(PetN) and Pet.r and not (Pet.g or Pet.dm) and Amount >= 5 then
+                    pcall(function() REMOTES.Game["Dark Matter Pets"]:InvokeServer(Pet.id) end)
+                    Amount = 0
+                end
+            end
+        end
+    end
+end
+
+local function hookSpecialEgg()
+    pcall(function()
+        local b = PG.PremiumShop.Frame.Pets.Pet.Pet.Buy
+        setupvalue(getconnections(b.MouseButton1Click)[1].Function, 3, 344286613)
+    end)
+end
+
+------------------------------------------------------------
+-- HATCH LOOP
+------------------------------------------------------------
+local Hatching = false
+
+local function startHatching()
+    if Hatching then return end
+    Hatching = true
+    spawn(function()
+        while Hatching do
+            local Stats = GetStats()
+            if not Stats or not Stats.Save then
+                wait(1)
+                continue
+            end
+
+            local Save = Stats.Save
+            local numToBuy = (Save.PetSlots - #Save.Pets)
+            if numToBuy <= 0 then wait(0.5); continue end
+
+            local toDelete = {}
+            local done = 0
+
+            for i = 1, numToBuy do
+                spawn(function()
+                    pcall(function()
+                        local success, pet = REMOTES.Game.Shop:InvokeServer("Buy", "Eggs", Settings.Tier)
+                        if success and pet and pet[1] and pet[1][1] and isBlacklisted(pet[1][1].n) then
+                            table.insert(toDelete, pet[1][1].id)
+                        end
+                    end)
+                    done = done + 1
+                end)
+            end
+
+            local t = 0
+            while done < numToBuy and t < 15 do
+                wait(0.1); t = t + 0.1
+            end
+
+            if #toDelete > 0 then
+                pcall(function()
+                    REMOTES.Game.Inventory:InvokeServer("MultiDelete", toDelete)
+                end)
+            end
+            if Settings.Combine then spawn(combine) end
+
+            wait(0.3)
+        end
+    end)
+end
+
+local function stopHatching()
+    Hatching = false
+end
+
+------------------------------------------------------------
+-- GUI BUILD
+------------------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "HatchGUI"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = PG
+
+local ACCENT = Color3.fromRGB(120, 90, 255)
+local BG = Color3.fromRGB(18, 18, 24)
+local PANEL = Color3.fromRGB(26, 26, 34)
+local PANEL2 = Color3.fromRGB(36, 36, 46)
+local TEXT = Color3.fromRGB(235, 235, 245)
+local SUB = Color3.fromRGB(150, 150, 170)
+
+-- main frame
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.new(0, 560, 0, 420)
+Main.Position = UDim2.new(0.5, -280, 0.5, -210)
+Main.BackgroundColor3 = BG
+Main.BorderSizePixel = 0
+Main.Parent = gui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+local outline = Instance.new("UIStroke", Main)
+outline.Color = Color3.fromRGB(60, 60, 80)
+outline.Thickness = 1.5
+
+-- title bar
+local Title = Instance.new("Frame")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = PANEL
+Title.BorderSizePixel = 0
+Title.Parent = Main
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 12)
+
+local titleFix = Instance.new("Frame")
+titleFix.Size = UDim2.new(1, 0, 0, 14)
+titleFix.Position = UDim2.new(0, 0, 1, -14)
+titleFix.BackgroundColor3 = PANEL
+titleFix.BorderSizePixel = 0
+titleFix.Parent = Title
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -120, 1, 0)
+TitleLabel.Position = UDim2.new(0, 16, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "🥚  Hatching GUI"
+TitleLabel.TextColor3 = TEXT
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 17
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = Title
+
+-- dragging
+do
+    local dragging, start, startPos
+    Title.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; start = i.Position; startPos = Main.Position
+        end
+    end)
+    Title.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
+    UIS.InputChanged:Connect(function(i)
+        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+            local d = i.Position - start
+            Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
+                                       startPos.Y.Scale, startPos.Y.Offset + d.Y)
+        end
+    end)
+end
+
+-- close
+local Close = Instance.new("TextButton")
+Close.Size = UDim2.new(0, 30, 0, 30)
+Close.Position = UDim2.new(1, -38, 0, 5)
+Close.BackgroundColor3 = Color3.fromRGB(210, 70, 70)
+Close.Text = "×"
+Close.TextColor3 = Color3.fromRGB(255, 255, 255)
+Close.Font = Enum.Font.GothamBold
+Close.TextSize = 18
+Close.Parent = Title
+Instance.new("UICorner", Close).CornerRadius = UDim.new(0, 8)
+Close.MouseButton1Click:Connect(function() gui:Destroy() end)
+
+-- minimize
+local Min = Instance.new("TextButton")
+Min.Size = UDim2.new(0, 30, 0, 30)
+Min.Position = UDim2.new(1, -72, 0, 5)
+Min.BackgroundColor3 = Color3.fromRGB(210, 170, 60)
+Min.Text = "—"
+Min.TextColor3 = Color3.fromRGB(255, 255, 255)
+Min.Font = Enum.Font.GothamBold
+Min.TextSize = 18
+Min.Parent = Title
+Instance.new("UICorner", Min).CornerRadius = UDim.new(0, 8)
+
+local minState = false
+local fullSize = Main.Size
+local minSize = UDim2.new(0, 560, 0, 40)
+Min.MouseButton1Click:Connect(function()
+    minState = not minState
+    TweenService:Create(Main, TweenInfo.new(0.2), { Size = minState and minSize or fullSize }):Play()
+end)
+
+------------------------------------------------------------
+-- TABS
+------------------------------------------------------------
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1, -24, 0, 36)
+TabBar.Position = UDim2.new(0, 12, 0, 50)
+TabBar.BackgroundColor3 = PANEL
+TabBar.BorderSizePixel = 0
+TabBar.Parent = Main
+Instance.new("UICorner", TabBar).CornerRadius = UDim.new(0, 8)
+
+local PageHolder = Instance.new("Frame")
+PageHolder.Size = UDim2.new(1, -24, 1, -106)
+PageHolder.Position = UDim2.new(0, 12, 0, 94)
+PageHolder.BackgroundTransparency = 1
+PageHolder.Parent = Main
+
+local Tabs, Pages = {}, {}
+local activeTab = nil
+
+local function createTab(name, order, total)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1/total, -6, 1, -6)
+    btn.Position = UDim2.new((order-1)/total, 3, 0, 3)
+    btn.BackgroundColor3 = PANEL2
+    btn.Text = name
+    btn.TextColor3 = SUB
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.AutoButtonColor = false
+    btn.Parent = TabBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local page = Instance.new("Frame")
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.Visible = false
+    page.Parent = PageHolder
+
+    table.insert(Tabs, {btn = btn, page = page, name = name})
+    return page
+end
+
+local function switchTab(idx)
+    for i, t in ipairs(Tabs) do
+        local on = (i == idx)
+        t.page.Visible = on
+        t.btn.BackgroundColor3 = on and ACCENT or PANEL2
+        t.btn.TextColor3 = on and Color3.fromRGB(255,255,255) or SUB
+    end
+    activeTab = idx
+end
+
+--============ TAB 1: HATCH ============
+local HatchPage = createTab("Hatch", 1, 3)
+
+-- tier label
+local TierLbl = Instance.new("TextLabel")
+TierLbl.Size = UDim2.new(1, 0, 0, 20)
+TierLbl.Position = UDim2.new(0, 4, 0, 4)
+TierLbl.BackgroundTransparency = 1
+TierLbl.Text = "EGG TIER"
+TierLbl.TextColor3 = SUB
+TierLbl.Font = Enum.Font.GothamBold
+TierLbl.TextSize = 11
+TierLbl.TextXAlignment = Enum.TextXAlignment.Left
+TierLbl.Parent = HatchPage
+
+local TierBtn = Instance.new("TextButton")
+TierBtn.Size = UDim2.new(1, -8, 0, 36)
+TierBtn.Position = UDim2.new(0, 4, 0, 26)
+TierBtn.BackgroundColor3 = PANEL2
+TierBtn.Text = "  " .. Settings.Tier .. "        ▼"
+TierBtn.TextColor3 = TEXT
+TierBtn.Font = Enum.Font.Gotham
+TierBtn.TextSize = 14
+TierBtn.TextXAlignment = Enum.TextXAlignment.Left
+TierBtn.Parent = HatchPage
+Instance.new("UICorner", TierBtn).CornerRadius = UDim.new(0, 8)
+
+-- dropdown rendered as a floating frame parented to gui so no clipping
+local DropShadow = Instance.new("Frame")
+DropShadow.Size = UDim2.new(0, 0, 0, 0)
+DropShadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+DropShadow.BackgroundTransparency = 0.5
+DropShadow.BorderSizePixel = 0
+DropShadow.Visible = false
+DropShadow.ZIndex = 50
+DropShadow.Parent = gui
+Instance.new("UICorner", DropShadow).CornerRadius = UDim.new(0, 10)
+
+local Drop = Instance.new("ScrollingFrame")
+Drop.Size = UDim2.new(0, 0, 0, 0)
+Drop.BackgroundColor3 = PANEL
+Drop.BorderSizePixel = 0
+Drop.ScrollBarThickness = 6
+Drop.ScrollBarImageColor3 = ACCENT
+Drop.Visible = false
+Drop.ZIndex = 51
+Drop.CanvasSize = UDim2.new(0, 0, 0, #TierList * 30 + 8)
+Drop.Parent = gui
+Instance.new("UICorner", Drop).CornerRadius = UDim.new(0, 10)
+local dropStroke = Instance.new("UIStroke", Drop)
+dropStroke.Color = ACCENT
+dropStroke.Thickness = 1.5
+
+for i, tier in ipairs(TierList) do
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, -8, 0, 26)
+    b.Position = UDim2.new(0, 4, 0, (i-1) * 30 + 4)
+    b.BackgroundColor3 = PANEL2
+    b.Text = "  " .. tier
+    b.TextColor3 = TEXT
+    b.Font = Enum.Font.Gotham
+    b.TextSize = 13
+    b.TextXAlignment = Enum.TextXAlignment.Left
+    b.Parent = Drop
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    b.MouseEnter:Connect(function() b.BackgroundColor3 = ACCENT end)
+    b.MouseLeave:Connect(function() b.BackgroundColor3 = PANEL2 end)
+    b.MouseButton1Click:Connect(function()
+        Settings.Tier = tier
+        TierBtn.Text = "  " .. tier .. "        ▼"
+        Drop.Visible = false
+        DropShadow.Visible = false
+    end)
+end
+
+local dropOpen = false
+TierBtn.MouseButton1Click:Connect(function()
+    dropOpen = not dropOpen
+    if dropOpen then
+        local ap = TierBtn.AbsolutePosition
+        local as = TierBtn.AbsoluteSize
+        local height = math.min(#TierList * 30 + 8, 220)
+        Drop.Position = UDim2.new(0, ap.X, 0, ap.Y + as.Y + 4)
+        Drop.Size = UDim2.new(0, as.X, 0, height)
+        DropShadow.Position = Drop.Position
+        DropShadow.Size = Drop.Size
+        Drop.Visible = true
+        DropShadow.Visible = true
+        Drop.ZIndex = 51
+        DropShadow.ZIndex = 50
+    else
+        Drop.Visible = false
+        DropShadow.Visible = false
+    end
+end)
+
+UIS.InputBegan:Connect(function(i, gpe)
+    if gpe then return end
+    if dropOpen and i.UserInputType == Enum.UserInputType.MouseButton1 then
+        local mp = i.Position
+        local ap = Drop.AbsolutePosition
+        local as = Drop.AbsoluteSize
+        if not (mp.X >= ap.X and mp.X <= ap.X + as.X and mp.Y >= ap.Y and mp.Y <= ap.Y + as.Y) then
+            Drop.Visible = false
+            DropShadow.Visible = false
+            dropOpen = false
+        end
+    end
+end)
+
+-- toggles
+local function makeToggle(y, label, default, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -8, 0, 42)
+    row.Position = UDim2.new(0, 4, 0, y)
+    row.BackgroundColor3 = PANEL2
+    row.BorderSizePixel = 0
+    row.Parent = HatchPage
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -80, 1, 0)
+    l.Position = UDim2.new(0, 14, 0, 0)
+    l.BackgroundTransparency = 1
+    l.Text = label
+    l.TextColor3 = TEXT
+    l.Font = Enum.Font.Gotham
+    l.TextSize = 13
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.Parent = row
+
+    local pill = Instance.new("Frame")
+    pill.Size = UDim2.new(0, 46, 0, 24)
+    pill.Position = UDim2.new(1, -60, 0.5, -12)
+    pill.BackgroundColor3 = default and Color3.fromRGB(70, 200, 110) or Color3.fromRGB(70, 70, 85)
+    pill.BorderSizePixel = 0
+    pill.Parent = row
+    Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 18, 0, 18)
+    knob.Position = default and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BorderSizePixel = 0
+    knob.Parent = pill
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+    local state = default
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = row
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        TweenService:Create(pill, TweenInfo.new(0.15), {
+            BackgroundColor3 = state and Color3.fromRGB(70, 200, 110) or Color3.fromRGB(70, 70, 85)
+        }):Play()
+        TweenService:Create(knob, TweenInfo.new(0.15), {
+            Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+        }):Play()
+        if callback then callback(state) end
+    end)
+    return btn
+end
+
+makeToggle(76, "Auto Combine", Settings.Combine, function(v) Settings.Combine = v end)
+makeToggle(126, "Delete Client Updater", Settings.DeleteClientUpdater, function(v)
+    Settings.DeleteClientUpdater = v
+    if v then pcall(function() PG.Events:ClearAllChildren() end) end
+end)
+
+-- status label
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(1, -8, 0, 22)
+Status.Position = UDim2.new(0, 4, 0, 178)
+Status.BackgroundTransparency = 1
+Status.Text = "Idle"
+Status.TextColor3 = SUB
+Status.Font = Enum.Font.Gotham
+Status.TextSize = 12
+Status.TextXAlignment = Enum.TextXAlignment.Left
+Status.Parent = HatchPage
+
+-- start / stop
+local StartBtn = Instance.new("TextButton")
+StartBtn.Size = UDim2.new(0.5, -10, 0, 44)
+StartBtn.Position = UDim2.new(0, 4, 1, -52)
+StartBtn.BackgroundColor3 = Color3.fromRGB(70, 200, 110)
+StartBtn.Text = "▶  Start"
+StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartBtn.Font = Enum.Font.GothamBold
+StartBtn.TextSize = 15
+StartBtn.Parent = HatchPage
+Instance.new("UICorner", StartBtn).CornerRadius = UDim.new(0, 8)
+
+local StopBtn = Instance.new("TextButton")
+StopBtn.Size = UDim2.new(0.5, -10, 0, 44)
+StopBtn.Position = UDim2.new(0.5, 6, 1, -52)
+StopBtn.BackgroundColor3 = Color3.fromRGB(210, 70, 70)
+StopBtn.Text = "■  Stop"
+StopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StopBtn.Font = Enum.Font.GothamBold
+StopBtn.TextSize = 15
+StopBtn.Parent = HatchPage
+Instance.new("UICorner", StopBtn).CornerRadius = UDim.new(0, 8)
+
+StartBtn.MouseButton1Click:Connect(function()
+    if Hatching then return end
+    Status.Text = "Hatching " .. Settings.Tier .. "..."
+    Status.TextColor3 = Color3.fromRGB(70, 200, 110)
+    startHatching()
+end)
+StopBtn.MouseButton1Click:Connect(function()
+    stopHatching()
+    Status.Text = "Stopped"
+    Status.TextColor3 = Color3.fromRGB(210, 70, 70)
+end)
+
+-- premium hook
+local HookBtn = Instance.new("TextButton")
+HookBtn.Size = UDim2.new(1, -8, 0, 34)
+HookBtn.Position = UDim2.new(0, 4, 1, -100)
+HookBtn.BackgroundColor3 = Color3.fromRGB(120, 90, 255)
+HookBtn.Text = "🔓  Hook Premium Egg (Hallow / Snake)"
+HookBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+HookBtn.Font = Enum.Font.GothamBold
+HookBtn.TextSize = 12
+HookBtn.Parent = HatchPage
+Instance.new("UICorner", HookBtn).CornerRadius = UDim.new(0, 8)
+HookBtn.MouseButton1Click:Connect(function()
+    hookSpecialEgg()
+    HookBtn.Text = "✓  Hooked!"
+    task.wait(1.5)
+    HookBtn.Text = "🔓  Hook Premium Egg (Hallow / Snake)"
+end)
+
+--============ TAB 2: WHITELIST ============
+local WLPage = createTab("Whitelist", 2, 3)
+
+local WLSearch = Instance.new("TextBox")
+WLSearch.Size = UDim2.new(1, -100, 0, 36)
+WLSearch.Position = UDim2.new(0, 4, 0, 4)
+WLSearch.BackgroundColor3 = PANEL2
+WLSearch.PlaceholderText = "🔍  Search whitelist..."
+WLSearch.Text = ""
+WLSearch.TextColor3 = TEXT
+WLSearch.PlaceholderColor3 = SUB
+WLSearch.Font = Enum.Font.Gotham
+WLSearch.TextSize = 13
+WLSearch.ClearTextOnFocus = false
+WLSearch.Parent = WLPage
+Instance.new("UICorner", WLSearch).CornerRadius = UDim.new(0, 8)
+
+local AddBtn = Instance.new("TextButton")
+AddBtn.Size = UDim2.new(0, 88, 0, 36)
+AddBtn.Position = UDim2.new(1, -92, 0, 4)
+AddBtn.BackgroundColor3 = Color3.fromRGB(70, 200, 110)
+AddBtn.Text = "+  Add"
+AddBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AddBtn.Font = Enum.Font.GothamBold
+AddBtn.TextSize = 13
+AddBtn.Parent = WLPage
+Instance.new("UICorner", AddBtn).CornerRadius = UDim.new(0, 8)
+
+local WLList = Instance.new("ScrollingFrame")
+WLList.Size = UDim2.new(1, -8, 1, -50)
+WLList.Position = UDim2.new(0, 4, 0, 46)
+WLList.BackgroundColor3 = PANEL
+WLList.BorderSizePixel = 0
+WLList.ScrollBarThickness = 6
+WLList.ScrollBarImageColor3 = ACCENT
+WLList.CanvasSize = UDim2.new(0, 0, 0, 0)
+WLList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+WLList.Parent = WLPage
+Instance.new("UICorner", WLList).CornerRadius = UDim.new(0, 8)
+local wlPad = Instance.new("UIPadding", WLList)
+wlPad.PaddingTop = UDim.new(0, 4)
+
+local function renderWL(filter)
+    for _, c in ipairs(WLList:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
+    end
+    filter = (filter or ""):lower()
+    local sorted = {}
+    for _, n in ipairs(Settings.Whitelist) do table.insert(sorted, n) end
+    table.sort(sorted)
+
+    local y = 0
+    for _, name in ipairs(sorted) do
+        if filter == "" or name:lower():find(filter, 1, true) then
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1, -8, 0, 30)
+            row.Position = UDim2.new(0, 4, 0, y)
+            row.BackgroundColor3 = PANEL2
+            row.BorderSizePixel = 0
+            row.Parent = WLList
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1, -50, 1, 0)
+            lbl.Position = UDim2.new(0, 12, 0, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = name
+            lbl.TextColor3 = TEXT
+            lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 13
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.Parent = row
+
+            local rm = Instance.new("TextButton")
+            rm.Size = UDim2.new(0, 24, 0, 24)
+            rm.Position = UDim2.new(1, -30, 0.5, -12)
+            rm.BackgroundColor3 = Color3.fromRGB(210, 70, 70)
+            rm.Text = "×"
+            rm.TextColor3 = Color3.fromRGB(255, 255, 255)
+            rm.Font = Enum.Font.GothamBold
+            rm.TextSize = 15
+            rm.Parent = row
+            Instance.new("UICorner", rm).CornerRadius = UDim.new(0, 5)
+            rm.MouseButton1Click:Connect(function()
+                for i, v in ipairs(Settings.Whitelist) do
+                    if v == name then table.remove(Settings.Whitelist, i); break end
+                end
+                renderWL(WLSearch.Text)
+                if renderPets then renderPets(PetSearch.Text) end
+            end)
+
+            y = y + 34
+        end
+    end
+    WLList.CanvasSize = UDim2.new(0, 0, 0, y + 8)
+end
+
+WLSearch:GetPropertyChangedSignal("Text"):Connect(function() renderWL(WLSearch.Text) end)
+
+AddBtn.MouseButton1Click:Connect(function()
+    local t = WLSearch.Text
+    if t and #t > 0 and not table.find(Settings.Whitelist, t) then
+        table.insert(Settings.Whitelist, t)
+        WLSearch.Text = ""
+        renderWL("")
+    end
+end)
+
+--============ TAB 3: PETS ============
+local PetsPage = createTab("Pets", 3, 3)
+
+local PetSearch = Instance.new("TextBox")
+PetSearch.Size = UDim2.new(1, -8, 0, 36)
+PetSearch.Position = UDim2.new(0, 4, 0, 4)
+PetSearch.BackgroundColor3 = PANEL2
+PetSearch.PlaceholderText = "🔍  Search all pets..."
+PetSearch.Text = ""
+PetSearch.TextColor3 = TEXT
+PetSearch.PlaceholderColor3 = SUB
+PetSearch.Font = Enum.Font.Gotham
+PetSearch.TextSize = 13
+PetSearch.ClearTextOnFocus = false
+PetSearch.Parent = PetsPage
+Instance.new("UICorner", PetSearch).CornerRadius = UDim.new(0, 8)
+
+local PetList = Instance.new("ScrollingFrame")
+PetList.Size = UDim2.new(1, -8, 1, -50)
+PetList.Position = UDim2.new(0, 4, 0, 46)
+PetList.BackgroundColor3 = PANEL
+PetList.BorderSizePixel = 0
+PetList.ScrollBarThickness = 6
+PetList.ScrollBarImageColor3 = ACCENT
+PetList.CanvasSize = UDim2.new(0, 0, 0, 0)
+PetList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+PetList.Parent = PetsPage
+Instance.new("UICorner", PetList).CornerRadius = UDim.new(0, 8)
+local pPad = Instance.new("UIPadding", PetList)
+pPad.PaddingTop = UDim.new(0, 4)
+
+local allPets, seen = {}, {}
+for _, n in pairs(Lib) do
+    if not seen[n] then seen[n] = true; table.insert(allPets, n) end
+end
+table.sort(allPets)
+
+function renderPets(filter)
+    for _, c in ipairs(PetList:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
+    end
+    filter = (filter or ""):lower()
+    local y = 0
+    for _, name in ipairs(allPets) do
+        if filter == "" or name:lower():find(filter, 1, true) then
+            local inWL = table.find(Settings.Whitelist, name) ~= nil
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1, -8, 0, 30)
+            row.Position = UDim2.new(0, 4, 0, y)
+            row.BackgroundColor3 = inWL and Color3.fromRGB(34, 70, 44) or PANEL2
+            row.BorderSizePixel = 0
+            row.Parent = PetList
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1, -60, 1, 0)
+            lbl.Position = UDim2.new(0, 12, 0, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = name
+            lbl.TextColor3 = TEXT
+            lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 13
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.Parent = row
+
+            local tag = Instance.new("TextLabel")
+            tag.Size = UDim2.new(0, 46, 1, 0)
+            tag.Position = UDim2.new(1, -52, 0, 0)
+            tag.BackgroundTransparency = 1
+            tag.Text = inWL and "WL ✓" or "—"
+            tag.TextColor3 = inWL and Color3.fromRGB(120, 230, 140) or SUB
+            tag.Font = Enum.Font.GothamBold
+            tag.TextSize = 11
+            tag.TextXAlignment = Enum.TextXAlignment.Right
+            tag.Parent = row
+
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 1, 0)
+            btn.BackgroundTransparency = 1
+            btn.Text = ""
+            btn.Parent = row
+            btn.MouseButton1Click:Connect(function()
+                local idx = table.find(Settings.Whitelist, name)
+                if idx then table.remove(Settings.Whitelist, idx)
+                else table.insert(Settings.Whitelist, name) end
+                renderPets(PetSearch.Text)
+                renderWL(WLSearch.Text)
+            end)
+
+            y = y + 34
+        end
+    end
+    PetList.CanvasSize = UDim2.new(0, 0, 0, y + 8)
+end
+
+PetSearch:GetPropertyChangedSignal("Text"):Connect(function() renderPets(PetSearch.Text) end)
+
+-- wire tabs
+for i, t in ipairs(Tabs) do
+    t.btn.MouseButton1Click:Connect(function() switchTab(i) end)
+end
+switchTab(1)
+
+-- initial renders
+renderWL("")
+renderPets("")
+
+print("[HatchGUI v2] loaded")
