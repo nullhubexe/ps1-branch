@@ -21,6 +21,15 @@ local STEP            = 0.05    -- farm loop tick
 local LEVEL_INTERVAL  = 60      -- seconds between pet level refreshes
 local RECONCILE       = 15      -- seconds between safety re-scans of the coins
 
+-- Leveling knobs ------------------------------------------------------------
+-- The server throttles mining per coin, so stacking every pet on the SAME
+-- cane throws most of their mines away. This script now spreads the pets
+-- across DIFFERENT canes (see chooseCoin below) so several canes die at once.
+-- If leveling is still slower than you want, raise DAMAGE_MULT, and/or set
+-- ONESHOT = true so every mine is at least strong enough to kill the coin.
+local DAMAGE_MULT     = 1       -- multiplies mine power (raise to hit harder)
+local ONESHOT         = false   -- true = send enough power to one-shot the coin
+
 local WEBHOOK_URL     = ""      -- optional Discord webhook URL ("" = disabled)
 
 -- What every pet mines
@@ -191,17 +200,37 @@ table.insert(conns, COINS.ChildRemoved:Connect(function(coin)
     end
 end))
 
-local function pickTarget(name)
+-- Gather every live cane of a given name.
+local function aliveOf(name)
+    local arr = {}
     local bucket = tracked[name]
-    if not bucket then return nil end
+    if not bucket then return arr end
     for coin in pairs(bucket) do
         if coin.Parent then
             local hp = coin:FindFirstChild("Health")
             if hp and hp.Value > 0 then
-                return coin
+                table.insert(arr, coin)
             end
         else
             bucket[coin] = nil
+        end
+    end
+    return arr
+end
+
+-- Pick a coin for this worker that no earlier worker in the same tick took.
+-- Keeping pets on separate canes is what makes the server actually credit
+-- every mine, which is the main driver of faster leveling.
+local function chooseCoin(worker, used)
+    if worker.coin and worker.coin.Parent then
+        local hp = worker.coin:FindFirstChild("Health")
+        if hp and hp.Value > 0 and not used[worker.coin] then
+            return worker.coin
+        end
+    end
+    for _, coin in ipairs(aliveOf(worker.target)) do
+        if not used[coin] then
+            return coin
         end
     end
     return nil
@@ -211,17 +240,23 @@ end
 task.spawn(function()
     while running do
         local now = os.clock()
+        local used = {}
 
         for _, w in ipairs(workers) do
-            if now - w.last >= DELAY then
-                local coin = pickTarget(w.target)
-                if coin then
-                    w.last = now
-                    local bonus = math.max(1, w.lvl * 2 - 1)
-                    pcall(function()
-                        REMOTES.Game.Coins:FireServer("Mine", coin.Name, bonus, w.id)
-                    end)
+            w.coin = chooseCoin(w, used)
+            if w.coin then used[w.coin] = true end
+
+            if w.coin and now - w.last >= DELAY then
+                w.last = now
+                local hp = w.coin:FindFirstChild("Health")
+                local health = hp and hp.Value or 0
+                local bonus = math.max(1, w.lvl * 2 - 1) * DAMAGE_MULT
+                if ONESHOT and health > bonus then
+                    bonus = health
                 end
+                pcall(function()
+                    REMOTES.Game.Coins:FireServer("Mine", w.coin.Name, bonus, w.id)
+                end)
             end
         end
 
