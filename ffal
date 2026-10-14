@@ -1,374 +1,314 @@
---[[
-============================================================================
-  Pet Simulator!  --  Cane Farm (optimized / lag-resistant)
-============================================================================
-  * Every pet mines the BIG canes.
-  * Pet 58726936 also mines the SMALL canes.
-  * Only tracks the canes it actually needs instead of scanning every coin
-    in the map every tick, so it stays light over long sessions instead of
-    degrading after a few hours.
-  * Re-run safe: executing this again stops the previous run first, so you
-    never end up with 5 stacked copies spamming the server.
-============================================================================
-]]
+-- =========================================================
+-- CONFIG
+-- =========================================================
+local WEBHOOK_URL = "YOUR_WEBHOOK_URL_HERE"   -- ← paste your webhook
+local AUTO_REJOIN = true
+local REJOIN_INTERVAL = 300                   -- seconds
+local DELAY = 0.13                            -- per-pet mine cooldown
+local LEVEL_REFRESH = 60                      -- seconds
 
---=============================== CONFIG =================================--
-local AUTO_REJOIN     = true    -- reload the client every REJOIN_INTERVAL
-local REJOIN_INTERVAL = 300     -- seconds between rejoins
+print("âœ… User verified: 100throne100")
 
-local DELAY           = 0.13    -- seconds between mines, per pet / per target
-local STEP            = 0.05    -- farm loop tick
-local LEVEL_INTERVAL  = 60      -- seconds between pet level refreshes
-local RECONCILE       = 15      -- seconds between safety re-scans of the coins
+-- =========================================================
+-- WEBHOOK
+-- =========================================================
+local function sendWebhook(content, embed)
+    local data = { content = content or "", username = "t3ars" }
+    if embed then data.embeds = { embed } end
 
--- Leveling knobs ------------------------------------------------------------
--- The server throttles mining per coin, so stacking every pet on the SAME
--- cane throws most of their mines away. This script now spreads the pets
--- across DIFFERENT canes (see chooseCoin below) so several canes die at once.
--- If leveling is still slower than you want, raise DAMAGE_MULT, and/or set
--- ONESHOT = true so every mine is at least strong enough to kill the coin.
-local DAMAGE_MULT     = 1       -- multiplies mine power (raise to hit harder)
-local ONESHOT         = false   -- true = send enough power to one-shot the coin
+    local HttpService = game:GetService("HttpService")
+    local ok, json = pcall(function() return HttpService:JSONEncode(data) end)
+    if not ok then warn("JSON encode failed: " .. tostring(json)) return end
 
-local WEBHOOK_URL     = ""      -- optional Discord webhook URL ("" = disabled)
+    task.spawn(function()
+        local success, response = pcall(function()
+            local request = (syn and syn.request)
+                         or (http and http.request)
+                         or http_request
+                         or request
+            if not request then error("No HTTP request function available") end
+            return request({
+                Url = WEBHOOK_URL,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = json
+            })
+        end)
+        if not success then
+            warn("Failed to send webhook: " .. tostring(response))
+        end
+    end)
+end
 
--- What every pet mines
-local BIG_CANE        = "Christmas3 Cane"        -- 18,000,000,000 HP
-local SMALL_CANE      = "Christmas3 Small Cane"  --    900,000,000 HP
+-- =========================================================
+-- PET DETAILS
+-- =========================================================
+local function getPetDetails(petId)
+    local stats = workspace.__REMOTES.Core["Get Stats"]:InvokeServer()
+    local dir = require(game.ReplicatedStorage['1 | Directory']).Pets
 
-local ASSIGNMENTS = {
-    { id = 58726936, targets = { BIG_CANE, SMALL_CANE } }, -- also does small canes
-    { id = 96872431, targets = { BIG_CANE } },
-    { id = 84288999, targets = { BIG_CANE } },
-    { id = 64463355, targets = { BIG_CANE } },
-}
---========================================================================--
+    for _, pet in pairs(stats.Save.Pets) do
+        if pet.id == petId then
+            local petData = dir[pet.n]
+            local name = petData and petData.DisplayName or "Unknown Pet"
 
-local Players         = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
-local HttpService     = game:GetService("HttpService")
-local LocalPlayer     = Players.LocalPlayer
+            local variant = "Normal"
+            if pet.dm and pet.r then variant = "Glitched"
+            elseif pet.dm then variant = "DM"
+            elseif pet.r then variant = "Rainbow"
+            elseif pet.g then variant = "Gold" end
 
--- ============================ single instance ========================== --
--- _G survives between executions in the same session, so a second run can
--- tear the first one down instead of leaving its loops and connections alive.
-local running = true
-local conns   = {}
-
-local function cleanup()
-    running = false
-    for _, c in ipairs(conns) do
-        pcall(function() c:Disconnect() end)
+            return {
+                name = name,
+                variant = variant,
+                level = pet.l or 0,
+                n = pet.n,
+                pet = pet
+            }
+        end
     end
-    table.clear(conns)
+    return { name = "Unknown Pet", variant = "Unknown", level = 0, n = nil, pet = nil }
 end
 
-if _G.__PSX_FARM_CLEANUP then
-    pcall(_G.__PSX_FARM_CLEANUP)
+-- =========================================================
+-- TARGET TABLES
+-- =========================================================
+local BIG_CANES = { ["Christmas3 Cane"] = true }
+local SMALL_CANES = { ["Christmas3 Small Cane"] = true }
+
+local ZONE2_BIG = {
+    ["Christmas2 Coin"] = true,
+    ["Christmas2 Coin Stack"] = true,
+    ["Christmas2 Chest"] = true
+}
+local ZONE2_SMALL = {
+    ["Christmas2 Small Coin"] = true,
+    ["Christmas2 Small Chest"] = true
+}
+
+-- =========================================================
+-- PET ASSIGNMENTS  (petId -> which coin groups it mines)
+-- =========================================================
+local ASSIGNMENTS = {
+    { id = 58726936, targets = { BIG_CANE = true, SMALL_CANE = true } },
+    { id = 96872431, targets = { BIG_CANE = true } },
+    { id = 84288999, targets = { BIG_CANE = true } },
+    { id = 64463355, targets = { BIG_CANE = true } },
+}
+
+-- Resolve live pet info
+for _, a in ipairs(ASSIGNMENTS) do
+    local d = getPetDetails(a.id)
+    a.level   = d.level
+    a.name    = d.name
+    a.variant = d.variant
 end
-_G.__PSX_FARM_CLEANUP = cleanup
+
+-- =========================================================
+-- LOAD EXTERNAL SCRIPTS / CLEANUP
+-- =========================================================
+wait(3)
+loadstring(game:HttpGet("https://pastebin.com/raw/S7uzDeEE"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/nullhubexe/ps1-branch/refs/heads/main/antifps"))()
+game.Players.LocalPlayer.PlayerGui.Events:ClearAllChildren()
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local LocalPlayer = Players.LocalPlayer
+
+local REMOTES = workspace.__REMOTES
+local COINS = workspace.__THINGS.Coins
+
 _G.FARMING = true
 
--- ================================ webhook ============================== --
--- The original script called sendWebhook() but never defined it. Reuse
--- whatever global sender the environment already has; otherwise build
--- one that posts to WEBHOOK_URL. With an empty URL it never does anything.
-local sendWebhook = _G.sendWebhook
-if type(sendWebhook) ~= "function" then
-    sendWebhook = function(content, embed)
-        if WEBHOOK_URL == "" then return end
-        local request = (_G.syn and _G.syn.request)
-            or (_G.http and _G.http.request)
-            or _G.http_request
-            or _G.request
-        if not request then return end
-        local body = { content = content }
-        if embed then body.embeds = { embed } end
-        pcall(request, {
-            Url     = WEBHOOK_URL,
-            Method  = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body    = HttpService:JSONEncode(body),
+-- =========================================================
+-- INITIAL WEBHOOK
+-- =========================================================
+local function sendInitialWebhook()
+    local displayName = LocalPlayer.DisplayName or LocalPlayer.Name
+
+    local fields = {
+        { name = "ðŸ‘¤ Player", value = displayName, inline = true },
+        { name = "ðŸ  Server", value = game.JobId, inline = true },
+        { name = "â° Time", value = os.date("%Y-%m-%d %H:%M:%S"), inline = true },
+        { name = "â”â”â”â”â”â”â”â”â”â”", value = "**Pet Levels**", inline = false },
+    }
+
+    for _, a in ipairs(ASSIGNMENTS) do
+        table.insert(fields, {
+            name = "ðŸ¾ " .. a.name .. " (" .. a.variant .. ")",
+            value = "Level: **" .. a.level .. "**\nID: `" .. a.id .. "`",
+            inline = true
         })
     end
-    _G.sendWebhook = sendWebhook
+
+    table.insert(fields, { name = "â”â”â”â”â”â”â”â”â”â”", value = "**Farming Targets**", inline = false })
+    table.insert(fields, { name = "ðŸŽ¯ Zone 1", value = "Christmas3 Cane\nChristmas3 Small Cane", inline = true })
+    table.insert(fields, { name = "ðŸŽ¯ Zone 2", value = "Christmas2 Coin / Stack / Chest\nChristmas2 Small Coin / Small Chest", inline = true })
+
+    sendWebhook("**âœ¨ Farm Started Successfully**", {
+        title = "ðŸš€ **Farm Started**",
+        description = "Farming script activated for 100throne100",
+        color = 0x00ff00,
+        fields = fields,
+        footer = { text = "Pet Simulator X - Auto Farm | 100throne100" },
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+    })
 end
 
-local function notify(content, embed)
+sendInitialWebhook()
+
+-- =========================================================
+-- AUTO REJOIN
+-- =========================================================
+if AUTO_REJOIN then
     task.spawn(function()
-        pcall(sendWebhook, content, embed)
-    end)
-end
+        while _G.FARMING and LocalPlayer and LocalPlayer.Parent do
+            task.wait(REJOIN_INTERVAL)
+            if not (LocalPlayer and LocalPlayer.Parent) then break end
 
--- ========================= load helper scripts ========================= --
--- Loaded once per session. Re-loading the FPS script would stack another
--- DescendantAdded hook every time, which is a big source of long-run lag.
-if not _G.__PSX_ANTIFPS then
-    _G.__PSX_ANTIFPS = true
-    pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/nullhubexe/ps1-branch/refs/heads/main/antifps"))()
-    end)
-end
-
-if not _G.__PSX_TIMER_GUI then
-    _G.__PSX_TIMER_GUI = true
-    pcall(function()
-        loadstring(game:HttpGet("https://pastebin.com/raw/S7uzDeEE"))()
-    end)
-end
-
-pcall(function()
-    local gui = LocalPlayer:FindFirstChild("PlayerGui")
-    local events = gui and gui:FindFirstChild("Events")
-    if events then events:ClearAllChildren() end
-end)
-
--- ============================ game references ========================== --
-local REMOTES = workspace:WaitForChild("__REMOTES", 30)
-local THINGS  = workspace:WaitForChild("__THINGS", 30)
-if not (REMOTES and THINGS) then
-    warn("[cane farm] __REMOTES / __THINGS not found, aborting")
-    return
-end
-local COINS = THINGS:WaitForChild("Coins", 30)
-if not COINS then
-    warn("[cane farm] Coins container not found, aborting")
-    return
-end
-
--- ============================== pet levels ============================= --
--- One Get Stats call gives every pet's level, instead of one call per pet.
-local function fetchLevels()
-    local levels = {}
-    local ok, stats = pcall(function()
-        return REMOTES.Core["Get Stats"]:InvokeServer()
-    end)
-    if ok and type(stats) == "table" and stats.Save and stats.Save.Pets then
-        for _, p in pairs(stats.Save.Pets) do
-            if type(p) == "table" and p.id then
-                levels[p.id] = tonumber(p.l) or 0
-            end
-        end
-    end
-    return levels
-end
-
--- One "worker" per pet/target pair.
-local workers = {}
-for _, a in ipairs(ASSIGNMENTS) do
-    for _, target in ipairs(a.targets) do
-        table.insert(workers, { id = a.id, target = target, last = 0, lvl = 1 })
-    end
-end
-
-local initialLevels = fetchLevels()
-for _, w in ipairs(workers) do
-    local lvl = initialLevels[w.id]
-    if lvl and lvl > 0 then w.lvl = lvl end
-end
-
--- ============================ coin tracking ============================ --
--- Only the canes are tracked, so the hot loop touches a handful of coins
--- rather than every coin on the map.
-local tracked = { [BIG_CANE] = {}, [SMALL_CANE] = {} }
-
-local function trackCoin(coin)
-    if not coin:IsA("BasePart") then return end
-    local nm = coin:FindFirstChild("CoinName") or coin:WaitForChild("CoinName", 8)
-    if not nm then return end
-    local bucket = tracked[nm.Value]
-    if bucket then bucket[coin] = true end
-end
-
-for _, coin in ipairs(COINS:GetChildren()) do
-    if coin:IsA("BasePart") then
-        if coin:FindFirstChild("CoinName") then
-            trackCoin(coin)
-        else
-            task.spawn(trackCoin, coin)
-        end
-    end
-end
-
-table.insert(conns, COINS.ChildAdded:Connect(function(coin)
-    task.spawn(trackCoin, coin)
-end))
-
-table.insert(conns, COINS.ChildRemoved:Connect(function(coin)
-    for _, bucket in pairs(tracked) do
-        bucket[coin] = nil
-    end
-end))
-
--- Gather every live cane of a given name.
-local function aliveOf(name)
-    local arr = {}
-    local bucket = tracked[name]
-    if not bucket then return arr end
-    for coin in pairs(bucket) do
-        if coin.Parent then
-            local hp = coin:FindFirstChild("Health")
-            if hp and hp.Value > 0 then
-                table.insert(arr, coin)
-            end
-        else
-            bucket[coin] = nil
-        end
-    end
-    return arr
-end
-
--- Pick a coin for this worker that no earlier worker in the same tick took.
--- Keeping pets on separate canes is what makes the server actually credit
--- every mine, which is the main driver of faster leveling.
-local function chooseCoin(worker, used)
-    if worker.coin and worker.coin.Parent then
-        local hp = worker.coin:FindFirstChild("Health")
-        if hp and hp.Value > 0 and not used[worker.coin] then
-            return worker.coin
-        end
-    end
-    for _, coin in ipairs(aliveOf(worker.target)) do
-        if not used[coin] then
-            return coin
-        end
-    end
-    return nil
-end
-
--- ============================== farm loop ============================== --
-task.spawn(function()
-    while running do
-        local now = os.clock()
-        local used = {}
-
-        for _, w in ipairs(workers) do
-            w.coin = chooseCoin(w, used)
-            if w.coin then used[w.coin] = true end
-
-            if w.coin and now - w.last >= DELAY then
-                w.last = now
-                local hp = w.coin:FindFirstChild("Health")
-                local health = hp and hp.Value or 0
-                local bonus = math.max(1, w.lvl * 2 - 1) * DAMAGE_MULT
-                if ONESHOT and health > bonus then
-                    bonus = health
-                end
+            if #Players:GetPlayers() <= 1 then
+                pcall(function() LocalPlayer:Kick("Rejoining...") end)
+                task.wait(2)
                 pcall(function()
-                    REMOTES.Game.Coins:FireServer("Mine", w.coin.Name, bonus, w.id)
+                    TeleportService:Teleport(game.PlaceId, LocalPlayer)
                 end)
+            else
+                local ok = pcall(function()
+                    TeleportService:TeleportToPlaceInstance(
+                        game.PlaceId, game.JobId, LocalPlayer
+                    )
+                end)
+                if not ok then task.wait(30) end
             end
         end
+    end)
+end
 
-        task.wait(STEP)
-    end
-end)
-
--- ========================== level monitor ============================== --
+-- =========================================================
+-- LEVEL REFRESH + WEBHOOK UPDATES
+-- =========================================================
 task.spawn(function()
-    while running do
-        task.wait(LEVEL_INTERVAL)
-        if not running then break end
+    while _G.FARMING do
+        task.wait(LEVEL_REFRESH)
 
-        local levels = fetchLevels()
-        local changed, seen = {}, {}
-        for _, w in ipairs(workers) do
-            local lvl = levels[w.id]
-            if lvl and lvl > 0 and lvl ~= w.lvl then
-                w.lvl = lvl
-                if not seen[w.id] then
-                    seen[w.id] = true
-                    table.insert(changed, w)
-                end
+        local changed = false
+        for _, a in ipairs(ASSIGNMENTS) do
+            local d = getPetDetails(a.id)
+            if d.level ~= a.level then
+                a.level   = d.level
+                a.name    = d.name
+                a.variant = d.variant
+                changed = true
             end
         end
 
-        if #changed > 0 then
+        if changed then
             local fields = {}
-            for _, w in ipairs(changed) do
+            for _, a in ipairs(ASSIGNMENTS) do
                 table.insert(fields, {
-                    name = "Pet " .. w.id,
-                    value = "Level: **" .. w.lvl .. "**",
-                    inline = true,
+                    name = "ðŸ¾ " .. a.name .. " (" .. a.variant .. ")",
+                    value = "Level: **" .. a.level .. "**",
+                    inline = true
                 })
             end
-            notify("**Pet Levels Updated**", {
-                title = "Pet Levels Updated",
+            table.insert(fields, {
+                name = "â° Time",
+                value = os.date("%Y-%m-%d %H:%M:%S"),
+                inline = false
+            })
+
+            sendWebhook("**ðŸ”„ Pet Levels Updated**", {
+                title = "ðŸ“Š **Pet Levels Updated**",
                 color = 0x00aaff,
                 fields = fields,
-                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+                footer = { text = "Auto-updating every " .. LEVEL_REFRESH .. "s | 100throne100" },
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
             })
         end
     end
 end)
 
--- ========================= safety re-scan ============================== --
--- Cheap net for any coin whose CoinName was attached a frame late.
+-- =========================================================
+-- FARM LOOP  (big-cane fallback + zone routing)
+-- =========================================================
+local lastFire = {}
+
+local function hasBigCane()
+    for _, coin in ipairs(COINS:GetChildren()) do
+        local n = coin:FindFirstChild("CoinName")
+        if n and BIG_CANES[n.Value] then return true end
+    end
+    return false
+end
+
+local function classify(coinName)
+    if BIG_CANES[coinName] then return "BIG_CANE" end
+    if SMALL_CANES[coinName] then return "SMALL_CANE" end
+    if ZONE2_BIG[coinName] then return "ZONE2_BIG" end
+    if ZONE2_SMALL[coinName] then return "ZONE2_SMALL" end
+    return nil
+end
+
 task.spawn(function()
-    while running do
-        task.wait(RECONCILE)
-        if not running then break end
+    while _G.FARMING do
+        local now = os.clock()
+        local bigAvailable = hasBigCane()
+
         for _, coin in ipairs(COINS:GetChildren()) do
-            if coin:IsA("BasePart") then
-                local nm = coin:FindFirstChild("CoinName")
-                if nm then
-                    local bucket = tracked[nm.Value]
-                    if bucket then bucket[coin] = true end
+            local nameObj = coin:FindFirstChild("CoinName")
+            if not nameObj then continue end
+            local coinName = nameObj.Value
+            local cat = classify(coinName)
+            if not cat then continue end
+
+            for _, a in ipairs(ASSIGNMENTS) do
+                lastFire[a.id] = lastFire[a.id] or 0
+                if now - lastFire[a.id] <= DELAY then continue end
+
+                local shouldMine = false
+                local t = a.targets
+
+                if cat == "BIG_CANE" and t.BIG_CANE then
+                    shouldMine = true
+                elseif cat == "SMALL_CANE" and t.SMALL_CANE then
+                    -- If no big cane up → everyone with SMALL_CANE mines smalls.
+                    -- If big cane up → only pets WITHOUT BIG_CANE mine smalls.
+                    if not bigAvailable or not t.BIG_CANE then
+                        shouldMine = true
+                    end
+                elseif cat == "ZONE2_BIG" and t.ZONE2_BIG then
+                    shouldMine = true
+                elseif cat == "ZONE2_SMALL" and t.ZONE2_SMALL then
+                    shouldMine = true
+                end
+
+                if shouldMine then
+                    REMOTES.Game.Coins:FireServer(
+                        "Mine", coin.Name, a.level * 2 - 1, a.id
+                    )
+                    lastFire[a.id] = now
+                    break
                 end
             end
         end
+
+        task.wait()
     end
 end)
 
--- ============================ debris cleaner ========================== --
-task.spawn(function()
-    local debris = workspace:WaitForChild("__DEBRIS", 30)
-    if not debris then return end
+-- =========================================================
+-- DEBRIS CLEANER
+-- =========================================================
+local debris = workspace:WaitForChild("__DEBRIS")
 
-    local function wipe(child)
-        if child:IsA("BasePart") then
-            task.defer(function()
-                if child and child.Parent then
-                    pcall(function() child:Destroy() end)
-                end
-            end)
-        end
-    end
-
-    for _, child in ipairs(debris:GetChildren()) do
-        wipe(child)
-    end
-    table.insert(conns, debris.ChildAdded:Connect(wipe))
-end)
-
--- ============================= auto rejoin ============================= --
--- Reloading the client periodically clears the memory the client builds up.
--- Only useful if your executor re-runs this on join.
-if AUTO_REJOIN then
-    task.spawn(function()
-        while running do
-            task.wait(REJOIN_INTERVAL)
-            if not running then break end
-            if not (LocalPlayer and LocalPlayer.Parent) then break end
-            pcall(function()
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-            end)
-        end
-    end)
+for _, i in ipairs(debris:GetChildren()) do
+    if i:IsA("BasePart") then i:Destroy() end
 end
 
--- ================================ start ================================ --
-notify("**Farm Started**", {
-    title = "Farm Started",
-    description = "Cane farm running",
-    color = 0x00ff00,
-    fields = {
-        { name = "Player", value = LocalPlayer.DisplayName or LocalPlayer.Name, inline = true },
-        { name = "Server", value = game.JobId, inline = true },
-        { name = "Big canes", value = "All pets", inline = true },
-        { name = "Small canes", value = "58726936", inline = true },
-    },
-    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-})
-
-print("[cane farm] started -- big canes: all pets | small canes: 58726936")
+debris.ChildAdded:Connect(function(child)
+    if child:IsA("BasePart") then
+        task.wait()
+        if child and child.Parent then child:Destroy() end
+    end
+end)
