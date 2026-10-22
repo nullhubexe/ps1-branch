@@ -91,7 +91,7 @@ local ZONE2_SMALL = {
 -- =========================================================
 local ASSIGNMENTS = {
     { id = 38713749, targets = { SMALL_CANE = true } },
-    { id = 35997302, targets = { BIG_CANE = true } },
+    { id = 59047281, targets = { BIG_CANE = true } },
     { id = 41285312, targets = { ZONE2_BIG = true } },
     { id = 42908902, targets = { ZONE2_SMALL = true } },
 }
