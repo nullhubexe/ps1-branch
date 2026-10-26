@@ -89,20 +89,18 @@ local ZONE2_SMALL = {
 -- =========================================================
 -- PET ASSIGNMENTS  (petId -> which coin groups it mines)
 -- =========================================================
+-- =========================================================
+-- PET ASSIGNMENTS  (petId -> which coin groups it mines)
+-- =========================================================
 local ASSIGNMENTS = {
-    { id = 58726936, targets = { BIG_CANE = true, SMALL_CANE = true } },
-    { id = 96872431, targets = { BIG_CANE = true } },
-    { id = 84288999, targets = { BIG_CANE = true } },
-    { id = 64463355, targets = { BIG_CANE = true } },
-}
+    -- 19197206 → mines BOTH canes (big + small) AND zone 2 stuff
+    { id = 19197206, targets = { BIG_CANE = true, SMALL_CANE = true, ZONE2_BIG = true, ZONE2_SMALL = true } },
 
--- Resolve live pet info
-for _, a in ipairs(ASSIGNMENTS) do
-    local d = getPetDetails(a.id)
-    a.level   = d.level
-    a.name    = d.name
-    a.variant = d.variant
-end
+    -- The rest: small + big xmas 2 (zone 2) stuff only
+    { id = 57088293, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 64654401, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 69835896, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+}
 
 -- =========================================================
 -- LOAD EXTERNAL SCRIPTS / CLEANUP
