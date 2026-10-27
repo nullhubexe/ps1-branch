@@ -7,7 +7,7 @@ local REJOIN_INTERVAL = 300                   -- seconds
 local DELAY = 0.13                            -- per-pet mine cooldown
 local LEVEL_REFRESH = 60                      -- seconds
 
-print("âœ… User verified: 100throne100")
+print("✅ User verified: 100throne100")
 
 -- =========================================================
 -- WEBHOOK
@@ -41,16 +41,26 @@ local function sendWebhook(content, embed)
 end
 
 -- =========================================================
--- PET DETAILS
+-- PET DETAILS  (safe, nil-guarded)
 -- =========================================================
 local function getPetDetails(petId)
-    local stats = workspace.__REMOTES.Core["Get Stats"]:InvokeServer()
-    local dir = require(game.ReplicatedStorage['1 | Directory']).Pets
+    local ok, stats = pcall(function()
+        return workspace.__REMOTES.Core["Get Stats"]:InvokeServer()
+    end)
+    if not ok or not stats or not stats.Save or not stats.Save.Pets then
+        return { name = "Unknown Pet", variant = "Unknown", level = 0, n = nil, pet = nil }
+    end
+
+    local okDir, dir = pcall(function()
+        return require(game.ReplicatedStorage['1 | Directory']).Pets
+    end)
 
     for _, pet in pairs(stats.Save.Pets) do
         if pet.id == petId then
-            local petData = dir[pet.n]
-            local name = petData and petData.DisplayName or "Unknown Pet"
+            local name = "Unknown Pet"
+            if okDir and dir and pet.n and dir[pet.n] and dir[pet.n].DisplayName then
+                name = dir[pet.n].DisplayName
+            end
 
             local variant = "Normal"
             if pet.dm and pet.r then variant = "Glitched"
@@ -67,15 +77,13 @@ local function getPetDetails(petId)
             }
         end
     end
+
     return { name = "Unknown Pet", variant = "Unknown", level = 0, n = nil, pet = nil }
 end
 
 -- =========================================================
 -- TARGET TABLES
 -- =========================================================
-local BIG_CANES = { ["Christmas3 Cane"] = true }
-local SMALL_CANES = { ["Christmas3 Small Cane"] = true }
-
 local ZONE2_BIG = {
     ["Christmas2 Coin"] = true,
     ["Christmas2 Coin Stack"] = true,
@@ -87,41 +95,31 @@ local ZONE2_SMALL = {
 }
 
 -- =========================================================
--- PET ASSIGNMENTS  (petId -> which coin groups it mines)
+-- PET ASSIGNMENTS — all pets mine all Xmas 2 coin types
 -- =========================================================
--- =========================================================
--- PET ASSIGNMENTS  (14 pets)
--- =========================================================
-local ASSIGNMENTS = {
-    -- ── SMALL XMAS COINS (2 pets) ────────────────────────
-    { id = 44416290, targets = { ZONE2_SMALL = true } },
-    { id = 90644735, targets = { ZONE2_SMALL = true } },
-
-    -- ── XMAS COINS / NOT SMALL = ZONE2_BIG (3 pets) ──────
-    { id = 69725952, targets = { ZONE2_BIG = true } },
-    { id = 69529146, targets = { ZONE2_BIG = true } },
-    { id = 48974970, targets = { ZONE2_BIG = true } },
-
-    -- ── SMALL CANES (5 pets) ─────────────────────────────
-    { id = 26449546, targets = { SMALL_CANE = true } },
-    { id = 16502748, targets = { SMALL_CANE = true } },
-    { id = 42236362, targets = { SMALL_CANE = true } },
-    { id = 979353,   targets = { SMALL_CANE = true } },
-    { id = 22238259, targets = { SMALL_CANE = true } },
-
-    -- ── BIG CANDY CANES (4 pets) ─────────────────────────
-    { id = 56951849, targets = { BIG_CANE = true } },
-    { id = 53047230, targets = { BIG_CANE = true } },
-    { id = 54714808, targets = { BIG_CANE = true } },
-    { id = 38853492, targets = { BIG_CANE = true } },
+local PET_IDS = {
+    44416290,
+    27298389,
+    36884202,
+    90644735,
+    25704896,
+    26060720,
+    8612329,
+    32241020,
+    280622,
+    97045763,
+    10994613,
+    47995795,
+    99152293,
+    30065008,
 }
 
--- Resolve live pet info
-for _, a in ipairs(ASSIGNMENTS) do
-    local d = getPetDetails(a.id)
-    a.level   = d.level
-    a.name    = d.name
-    a.variant = d.variant
+local ASSIGNMENTS = {}
+for _, id in ipairs(PET_IDS) do
+    table.insert(ASSIGNMENTS, {
+        id = id,
+        targets = { ZONE2_BIG = true, ZONE2_SMALL = true }
+    })
 end
 
 -- =========================================================
@@ -142,33 +140,55 @@ local COINS = workspace.__THINGS.Coins
 _G.FARMING = true
 
 -- =========================================================
+-- RESOLVE PET INFO (with retry)
+-- =========================================================
+for _, a in ipairs(ASSIGNMENTS) do
+    local d = getPetDetails(a.id)
+    local tries = 0
+    while d.name == "Unknown Pet" and tries < 20 and _G.FARMING do
+        task.wait(0.5)
+        d = getPetDetails(a.id)
+        tries += 1
+    end
+    a.level   = d.level or 0
+    a.name    = d.name or "Unknown Pet"
+    a.variant = d.variant or "Unknown"
+end
+
+-- =========================================================
 -- INITIAL WEBHOOK
 -- =========================================================
 local function sendInitialWebhook()
     local displayName = LocalPlayer.DisplayName or LocalPlayer.Name
+    local resolved = 0
+    for _, a in ipairs(ASSIGNMENTS) do
+        if a.name ~= "Unknown Pet" then resolved += 1 end
+    end
 
     local fields = {
-        { name = "ðŸ‘¤ Player", value = displayName, inline = true },
-        { name = "ðŸ  Server", value = game.JobId, inline = true },
-        { name = "â° Time", value = os.date("%Y-%m-%d %H:%M:%S"), inline = true },
-        { name = "â”â”â”â”â”â”â”â”â”â”", value = "**Pet Levels**", inline = false },
+        { name = "👤 Player", value = tostring(displayName), inline = true },
+        { name = "🏠 Server", value = tostring(game.JobId), inline = true },
+        { name = "⏰ Time",   value = os.date("%Y-%m-%d %H:%M:%S"), inline = true },
+        { name = "📦 Pets Resolved", value = resolved .. " / " .. #ASSIGNMENTS, inline = false },
     }
 
     for _, a in ipairs(ASSIGNMENTS) do
+        local petName    = tostring(a.name or "Unknown Pet")
+        local petVariant = tostring(a.variant or "Unknown")
+        local petLevel   = tostring(a.level or 0)
         table.insert(fields, {
-            name = "ðŸ¾ " .. a.name .. " (" .. a.variant .. ")",
-            value = "Level: **" .. a.level .. "**\nID: `" .. a.id .. "`",
+            name = "🐾 " .. petName .. " (" .. petVariant .. ")",
+            value = "Level: **" .. petLevel .. "**\nID: `" .. tostring(a.id) .. "`",
             inline = true
         })
     end
 
-    table.insert(fields, { name = "â”â”â”â”â”â”â”â”â”â”", value = "**Farming Targets**", inline = false })
-    table.insert(fields, { name = "ðŸŽ¯ Zone 1", value = "Christmas3 Cane\nChristmas3 Small Cane", inline = true })
-    table.insert(fields, { name = "ðŸŽ¯ Zone 2", value = "Christmas2 Coin / Stack / Chest\nChristmas2 Small Coin / Small Chest", inline = true })
+    table.insert(fields, { name = "━━━━━━━━━━", value = "**Farming Targets**", inline = false })
+    table.insert(fields, { name = "🎯 Zone 2 (All Pets)", value = "Christmas2 Coin\nChristmas2 Coin Stack\nChristmas2 Chest\nChristmas2 Small Coin\nChristmas2 Small Chest", inline = false })
 
-    sendWebhook("**âœ¨ Farm Started Successfully**", {
-        title = "ðŸš€ **Farm Started**",
-        description = "Farming script activated for 100throne100",
+    sendWebhook("**✨ Farm Started Successfully**", {
+        title = "🚀 **Farm Started**",
+        description = "All pets farming Zone 2 for 100throne100",
         color = 0x00ff00,
         fields = fields,
         footer = { text = "Pet Simulator X - Auto Farm | 100throne100" },
@@ -215,10 +235,13 @@ task.spawn(function()
         local changed = false
         for _, a in ipairs(ASSIGNMENTS) do
             local d = getPetDetails(a.id)
-            if d.level ~= a.level then
-                a.level   = d.level
-                a.name    = d.name
-                a.variant = d.variant
+            local newLevel   = d.level or 0
+            local newName    = d.name or "Unknown Pet"
+            local newVariant = d.variant or "Unknown"
+            if newLevel ~= a.level or newName ~= a.name or newVariant ~= a.variant then
+                a.level   = newLevel
+                a.name    = newName
+                a.variant = newVariant
                 changed = true
             end
         end
@@ -226,20 +249,23 @@ task.spawn(function()
         if changed then
             local fields = {}
             for _, a in ipairs(ASSIGNMENTS) do
+                local petName    = tostring(a.name or "Unknown Pet")
+                local petVariant = tostring(a.variant or "Unknown")
+                local petLevel   = tostring(a.level or 0)
                 table.insert(fields, {
-                    name = "ðŸ¾ " .. a.name .. " (" .. a.variant .. ")",
-                    value = "Level: **" .. a.level .. "**",
+                    name = "🐾 " .. petName .. " (" .. petVariant .. ")",
+                    value = "Level: **" .. petLevel .. "**",
                     inline = true
                 })
             end
             table.insert(fields, {
-                name = "â° Time",
+                name = "⏰ Time",
                 value = os.date("%Y-%m-%d %H:%M:%S"),
                 inline = false
             })
 
-            sendWebhook("**ðŸ”„ Pet Levels Updated**", {
-                title = "ðŸ“Š **Pet Levels Updated**",
+            sendWebhook("**🔄 Pet Levels Updated**", {
+                title = "📊 **Pet Levels Updated**",
                 color = 0x00aaff,
                 fields = fields,
                 footer = { text = "Auto-updating every " .. LEVEL_REFRESH .. "s | 100throne100" },
@@ -250,21 +276,11 @@ task.spawn(function()
 end)
 
 -- =========================================================
--- FARM LOOP  (big-cane fallback + zone routing)
+-- FARM LOOP
 -- =========================================================
 local lastFire = {}
 
-local function hasBigCane()
-    for _, coin in ipairs(COINS:GetChildren()) do
-        local n = coin:FindFirstChild("CoinName")
-        if n and BIG_CANES[n.Value] then return true end
-    end
-    return false
-end
-
 local function classify(coinName)
-    if BIG_CANES[coinName] then return "BIG_CANE" end
-    if SMALL_CANES[coinName] then return "SMALL_CANE" end
     if ZONE2_BIG[coinName] then return "ZONE2_BIG" end
     if ZONE2_SMALL[coinName] then return "ZONE2_SMALL" end
     return nil
@@ -273,42 +289,34 @@ end
 task.spawn(function()
     while _G.FARMING do
         local now = os.clock()
-        local bigAvailable = hasBigCane()
 
         for _, coin in ipairs(COINS:GetChildren()) do
             local nameObj = coin:FindFirstChild("CoinName")
-            if not nameObj then continue end
-            local coinName = nameObj.Value
-            local cat = classify(coinName)
-            if not cat then continue end
+            if nameObj then
+                local coinName = nameObj.Value
+                local cat = classify(coinName)
+                if cat then
+                    for _, a in ipairs(ASSIGNMENTS) do
+                        lastFire[a.id] = lastFire[a.id] or 0
+                        if now - lastFire[a.id] > DELAY then
+                            local shouldMine = false
+                            local t = a.targets
 
-            for _, a in ipairs(ASSIGNMENTS) do
-                lastFire[a.id] = lastFire[a.id] or 0
-                if now - lastFire[a.id] <= DELAY then continue end
+                            if cat == "ZONE2_BIG" and t.ZONE2_BIG then
+                                shouldMine = true
+                            elseif cat == "ZONE2_SMALL" and t.ZONE2_SMALL then
+                                shouldMine = true
+                            end
 
-                local shouldMine = false
-                local t = a.targets
-
-                if cat == "BIG_CANE" and t.BIG_CANE then
-                    shouldMine = true
-                elseif cat == "SMALL_CANE" and t.SMALL_CANE then
-                    -- If no big cane up → everyone with SMALL_CANE mines smalls.
-                    -- If big cane up → only pets WITHOUT BIG_CANE mine smalls.
-                    if not bigAvailable or not t.BIG_CANE then
-                        shouldMine = true
+                            if shouldMine then
+                                REMOTES.Game.Coins:FireServer(
+                                    "Mine", coin.Name, (a.level or 0) * 2 - 1, a.id
+                                )
+                                lastFire[a.id] = now
+                                break
+                            end
+                        end
                     end
-                elseif cat == "ZONE2_BIG" and t.ZONE2_BIG then
-                    shouldMine = true
-                elseif cat == "ZONE2_SMALL" and t.ZONE2_SMALL then
-                    shouldMine = true
-                end
-
-                if shouldMine then
-                    REMOTES.Game.Coins:FireServer(
-                        "Mine", coin.Name, a.level * 2 - 1, a.id
-                    )
-                    lastFire[a.id] = now
-                    break
                 end
             end
         end
