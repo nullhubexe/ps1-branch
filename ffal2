@@ -90,10 +90,10 @@ local ZONE2_SMALL = {
 -- PET ASSIGNMENTS  (petId -> which coin groups it mines)
 -- =========================================================
 local ASSIGNMENTS = {
-    { id = 38713749, targets = { SMALL_CANE = true } },
-    { id = 59047281, targets = { BIG_CANE = true } },
-    { id = 41285312, targets = { ZONE2_BIG = true } },
-    { id = 42908902, targets = { ZONE2_SMALL = true } },
+    { id = 83032575, targets = { ZONE2_BIG = true } },
+    { id = 34600446, targets = { ZONE2_SMALL = true } },
+    { id = 53754484, targets = { ZONE2_BIG = true } },
+    { id = 39304083, targets = { ZONE2_SMALL = true } },
 }
 
 -- Resolve live pet info
