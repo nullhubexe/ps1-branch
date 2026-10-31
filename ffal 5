@@ -97,7 +97,7 @@ local ZONE2_SMALL = {
 -- =========================================================
 local ASSIGNMENTS = {
     -- ── 1. BIG CANES (1 pet) ─────────────────────────────
-    { id = 23973676, targets = { BIG_CANE = true } },
+    { id = 5436493, targets = { BIG_CANE = true } },
 
     -- ── 2. SMALL CANES (1 pet) ───────────────────────────
     { id = 91419682, targets = { SMALL_CANE = true } },
