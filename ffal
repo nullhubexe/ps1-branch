@@ -102,12 +102,12 @@ local ZONE2_SMALL = {
 -- =========================================================
 local ASSIGNMENTS = {
     -- 19197206 → canes (big + small) AND zone 2 (big + small)
-    { id = 19197206, targets = { BIG_CANE = true, SMALL_CANE = true, ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 14273043, targets = { BIG_CANE = true, SMALL_CANE = true } },
 
     -- Rest → zone 2 (big + small) only
-    { id = 57088293, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
-    { id = 64654401, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
-    { id = 69835896, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 36111380, targets = { BIG_CANE = true, SMALL_CANE = true } },
+    { id = 79153381, targets = { BIG_CANE = true, SMALL_CANE = true } },
+    { id = 52373523, targets = { BIG_CANE = true, SMALL_CANE = true } },
 }
 
 -- =========================================================
