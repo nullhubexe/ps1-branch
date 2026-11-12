@@ -92,26 +92,29 @@ local ZONE2_SMALL = {
 -- =========================================================
 -- PET ASSIGNMENTS  (10 pets)
 -- =========================================================
+
+
+-- =========================================================
+-- PET ASSIGNMENTS  (10 pets)
+-- =========================================================
 local ASSIGNMENTS = {
     -- ── BIG CANES (1 pet) ────────────────────────────────
-    { id = 81848737, targets = { BIG_CANE = true } },
+    { id = 35267030, targets = { BIG_CANE = true } },
 
     -- ── SMALL CANES (1 pet) ──────────────────────────────
     { id = 35267030, targets = { SMALL_CANE = true } },
 
-    -- ── BIG XMAS 2 COINS (4 pets) ────────────────────────
-    { id = 72851413, targets = { ZONE2_BIG = true } },
-    { id = 92773426, targets = { ZONE2_BIG = true } },
-    { id = 11229205, targets = { ZONE2_BIG = true } },
-    { id = 43605760, targets = { ZONE2_BIG = true } },
-
-    -- ── SMALL XMAS 2 COINS (4 pets) ──────────────────────
-    { id = 77482938, targets = { ZONE2_SMALL = true } },
-    { id = 33597389, targets = { ZONE2_SMALL = true } },
-    { id = 98115411, targets = { ZONE2_SMALL = true } },
-    { id = 87756002, targets = { ZONE2_SMALL = true } },
+    -- ── ZONE 2: BIG + SMALL XMAS 2 COINS (9 pets) ────────
+    { id = 54551712, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 20147357, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 92847389, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 97588803, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 33953619, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 46325855, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 52919136, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 33971693, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 38994038, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
 }
-
 -- Resolve live pet info
 for _, a in ipairs(ASSIGNMENTS) do
     local d = getPetDetails(a.id)
