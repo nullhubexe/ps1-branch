@@ -89,11 +89,21 @@ local ZONE2_SMALL = {
 -- =========================================================
 -- PET ASSIGNMENTS  (petId -> which coin groups it mines)
 -- =========================================================
+-- =========================================================
+-- PET ASSIGNMENTS — ALL XMAS 2 COINS
+-- =========================================================
 local ASSIGNMENTS = {
-    { id = 37017751, targets = { SMALL_CANE = true } },
-    { id = 30997423, targets = { BIG_CANE = true } },
-    { id = 99727032, targets = { ZONE2_BIG = true } },
-    { id = 80971529, targets = { ZONE2_SMALL = true } },
+    { id = 86171500, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 40747685, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 90815238, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 14186340, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 24703542, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 11203888, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 2826758,  targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 93904002, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 61838719, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 13295342, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
+    { id = 56413198, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
 }
 
 -- Resolve live pet info
