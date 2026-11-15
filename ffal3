@@ -14,7 +14,7 @@ local PET_COOLDOWN = DELAY                    -- alias
 local LOW_DMG_THRESHOLD  = 100000   -- under this → all stack together
 local MID_DMG_THRESHOLD  = 500000   -- under this → prioritize big Xmas2 coins
 
-print("âœ… User verified: 100throne100")
+print("âœ… User verified: read")
 
 -- =========================================================
 -- WEBHOOK
