@@ -7,6 +7,13 @@ local REJOIN_INTERVAL = 300                   -- seconds
 local DELAY = 0.13                            -- per-pet mine cooldown
 local LEVEL_REFRESH = 60                      -- seconds
 
+local MAX_PER_COIN = 4                        -- cap for HIGH-tier pets
+local PET_COOLDOWN = DELAY                    -- alias
+
+-- Damage thresholds (based on level*2-1, the value sent to the remote)
+local LOW_DMG_THRESHOLD  = 100000   -- under this → all stack together
+local MID_DMG_THRESHOLD  = 500000   -- under this → prioritize big Xmas2 coins
+
 print("âœ… User verified: 100throne100")
 
 -- =========================================================
@@ -88,9 +95,6 @@ local ZONE2_SMALL = {
 
 -- =========================================================
 -- PET ASSIGNMENTS  (petId -> which coin groups it mines)
--- =========================================================
--- =========================================================
--- PET ASSIGNMENTS — ALL XMAS 2 COINS
 -- =========================================================
 local ASSIGNMENTS = {
     { id = 86171500, targets = { ZONE2_BIG = true, ZONE2_SMALL = true } },
@@ -240,9 +244,13 @@ task.spawn(function()
 end)
 
 -- =========================================================
--- FARM LOOP  (big-cane fallback + zone routing)
+-- FARM LOOP  (level-aware, 3 passes)
 -- =========================================================
-local lastFire = {}
+local lastFire = {}             -- petId -> os.clock() of last mine
+
+local function petDamage(level)
+    return level * 2 - 1
+end
 
 local function hasBigCane()
     for _, coin in ipairs(COINS:GetChildren()) do
@@ -265,28 +273,28 @@ task.spawn(function()
         local now = os.clock()
         local bigAvailable = hasBigCane()
 
-        for _, coin in ipairs(COINS:GetChildren()) do
-            local nameObj = coin:FindFirstChild("CoinName")
-            if not nameObj then continue end
-            local coinName = nameObj.Value
-            local cat = classify(coinName)
-            if not cat then continue end
+        -- count pets assigned to each coin this tick (for MAX_PER_COIN cap)
+        local hitsThisCoin = {}   -- coin.Name -> count
 
-            for _, a in ipairs(ASSIGNMENTS) do
-                lastFire[a.id] = lastFire[a.id] or 0
-                if now - lastFire[a.id] <= DELAY then continue end
+        -- ---- PASS 1: LOW pets (<100k) mine together, no cap ----
+        for _, a in ipairs(ASSIGNMENTS) do
+            lastFire[a.id] = lastFire[a.id] or 0
+            if now - lastFire[a.id] <= PET_COOLDOWN then continue end
+            if petDamage(a.level) >= LOW_DMG_THRESHOLD then continue end
+
+            local t = a.targets
+            for _, coin in ipairs(COINS:GetChildren()) do
+                local nameObj = coin:FindFirstChild("CoinName")
+                if not nameObj then continue end
+                local coinName = nameObj.Value
+                local cat = classify(coinName)
+                if not cat then continue end
 
                 local shouldMine = false
-                local t = a.targets
-
                 if cat == "BIG_CANE" and t.BIG_CANE then
                     shouldMine = true
                 elseif cat == "SMALL_CANE" and t.SMALL_CANE then
-                    -- If no big cane up → everyone with SMALL_CANE mines smalls.
-                    -- If big cane up → only pets WITHOUT BIG_CANE mine smalls.
-                    if not bigAvailable or not t.BIG_CANE then
-                        shouldMine = true
-                    end
+                    if not bigAvailable or not t.BIG_CANE then shouldMine = true end
                 elseif cat == "ZONE2_BIG" and t.ZONE2_BIG then
                     shouldMine = true
                 elseif cat == "ZONE2_SMALL" and t.ZONE2_SMALL then
@@ -298,6 +306,108 @@ task.spawn(function()
                         "Mine", coin.Name, a.level * 2 - 1, a.id
                     )
                     lastFire[a.id] = now
+                    hitsThisCoin[coin.Name] = (hitsThisCoin[coin.Name] or 0) + 1
+                    break
+                end
+            end
+        end
+
+        -- ---- PASS 2: MID pets (<500k) prioritize big Xmas2, together ----
+        for _, a in ipairs(ASSIGNMENTS) do
+            lastFire[a.id] = lastFire[a.id] or 0
+            if now - lastFire[a.id] <= PET_COOLDOWN then continue end
+            local dmg = petDamage(a.level)
+            if dmg < LOW_DMG_THRESHOLD or dmg >= MID_DMG_THRESHOLD then continue end
+
+            local t = a.targets
+            local fired = false
+
+            -- Try big Xmas2 coins first (Christmas2 Coin / Stack / Chest)
+            if t.ZONE2_BIG then
+                for _, coin in ipairs(COINS:GetChildren()) do
+                    local nameObj = coin:FindFirstChild("CoinName")
+                    if not nameObj then continue end
+                    if not ZONE2_BIG[nameObj.Value] then continue end
+
+                    REMOTES.Game.Coins:FireServer(
+                        "Mine", coin.Name, a.level * 2 - 1, a.id
+                    )
+                    lastFire[a.id] = now
+                    hitsThisCoin[coin.Name] = (hitsThisCoin[coin.Name] or 0) + 1
+                    fired = true
+                    break
+                end
+            end
+
+            if fired then continue end
+
+            -- Fallback: normal targeting if no big Xmas2 available
+            for _, coin in ipairs(COINS:GetChildren()) do
+                local nameObj = coin:FindFirstChild("CoinName")
+                if not nameObj then continue end
+                local coinName = nameObj.Value
+                local cat = classify(coinName)
+                if not cat then continue end
+
+                local used = hitsThisCoin[coin.Name] or 0
+                if used >= MAX_PER_COIN then continue end
+
+                local shouldMine = false
+                if cat == "BIG_CANE" and t.BIG_CANE then
+                    shouldMine = true
+                elseif cat == "SMALL_CANE" and t.SMALL_CANE then
+                    if not bigAvailable or not t.BIG_CANE then shouldMine = true end
+                elseif cat == "ZONE2_BIG" and t.ZONE2_BIG then
+                    shouldMine = true
+                elseif cat == "ZONE2_SMALL" and t.ZONE2_SMALL then
+                    shouldMine = true
+                end
+
+                if shouldMine then
+                    REMOTES.Game.Coins:FireServer(
+                        "Mine", coin.Name, a.level * 2 - 1, a.id
+                    )
+                    lastFire[a.id] = now
+                    hitsThisCoin[coin.Name] = used + 1
+                    break
+                end
+            end
+        end
+
+        -- ---- PASS 3: HIGH pets (500k+) normal spread behaviour ----
+        for _, a in ipairs(ASSIGNMENTS) do
+            lastFire[a.id] = lastFire[a.id] or 0
+            if now - lastFire[a.id] <= PET_COOLDOWN then continue end
+            if petDamage(a.level) < MID_DMG_THRESHOLD then continue end
+
+            local t = a.targets
+            for _, coin in ipairs(COINS:GetChildren()) do
+                local nameObj = coin:FindFirstChild("CoinName")
+                if not nameObj then continue end
+                local coinName = nameObj.Value
+                local cat = classify(coinName)
+                if not cat then continue end
+
+                local used = hitsThisCoin[coin.Name] or 0
+                if used >= MAX_PER_COIN then continue end
+
+                local shouldMine = false
+                if cat == "BIG_CANE" and t.BIG_CANE then
+                    shouldMine = true
+                elseif cat == "SMALL_CANE" and t.SMALL_CANE then
+                    if not bigAvailable or not t.BIG_CANE then shouldMine = true end
+                elseif cat == "ZONE2_BIG" and t.ZONE2_BIG then
+                    shouldMine = true
+                elseif cat == "ZONE2_SMALL" and t.ZONE2_SMALL then
+                    shouldMine = true
+                end
+
+                if shouldMine then
+                    REMOTES.Game.Coins:FireServer(
+                        "Mine", coin.Name, a.level * 2 - 1, a.id
+                    )
+                    lastFire[a.id] = now
+                    hitsThisCoin[coin.Name] = used + 1
                     break
                 end
             end
